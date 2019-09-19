@@ -1,5 +1,5 @@
 # CANLab-Multivariate-Scripts
-Pipeline to conduct Multivoxel Pattern Analysis (MVPA) or Represetational Similarity Analysis (RSA) on functional MRI data. Requires MATLAB, [SPM](https://www.fil.ion.ucl.ac.uk/spm/), and [CoSMoMVPA package](http://www.cosmomvpa.org/).
+Pipeline to conduct Multivoxel Pattern Analysis (MVPA) or Represetational Similarity Analysis (RSA) on functional MRI data. Requires [MATLAB](https://www.mathworks.com/products/matlab.html), [SPM](https://www.fil.ion.ucl.ac.uk/spm/), and [CoSMoMVPA package](http://www.cosmomvpa.org/).
 
 
 ```createParams.m```
