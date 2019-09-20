@@ -21,7 +21,9 @@
 %% Pre-Analysis Setup
 
 % Add CoSMoMVPA to the MATLAB search path
-addpath(genpath('/path/to/CoSMoToolbox'));
+%addpath(genpath('/path/to/CoSMoToolbox'));
+addpath(genpath...
+    ('/gpfs/group/nad12/default/nad12/toolbox/CoSMoMVPA-master/CoSMoMVPA-master'));
 
 % turn cosmo warnings off
 cosmo_warning('off');
@@ -94,7 +96,9 @@ for iteration=1:length(subjects)*length(rois)
     end
     
     % path to current region mask
-    curROI = fullfile(roi_path, ROI);
+    %curROI = fullfile(roi_path, ROI);
+    curROI = fullfile(roi_path, subject, ROI);
+    
     
     switch classificationType
         case 'RSA'
@@ -473,6 +477,9 @@ for iteration=1:length(subjects)*length(rois)
                     %%% Indentify trials of interest for each condition
                     for i=1:length(tasks)
                         currDataset(i).samples(:,logical(removeVoxels))=[];
+                        currDataset(i).fa.i(:,logical(removeVoxels))=[];
+                        currDataset(i).fa.j(:,logical(removeVoxels))=[];
+                        currDataset(i).fa.k(:,logical(removeVoxels))=[];
                         try
                             if exist('subConds','var')
                                 
@@ -500,9 +507,9 @@ for iteration=1:length(subjects)*length(rois)
                             else
                                 
                                 for ii=1:length(conds)
-                                    Cond(ii).labels = ~cellfun(@isempty, strfind...
+                                    Cond(ii).(tasks{i}).labels = ~cellfun(@isempty, strfind...
                                         (currDataset(i).sa.labels, ['-' conds{ii}]));
-                                    Cond(ii).idx = find(Cond(ii).labels == 1);
+                                    Cond(ii).(tasks{i}).idx = find(Cond(ii).(tasks{i}).labels == 1);
                                 end
                                 
                             end
@@ -510,162 +517,176 @@ for iteration=1:length(subjects)*length(rois)
                         catch
                             warning('Failure to define trial information. Set to debug mode.');
                         end
-                        
-                        for ii=1:length(conds)
+                    end
+                    
+                    % Parse data by task and condition
+                    counter=1;
+                    for i=1:length(currDataset)
+                        for ii=1:length(Cond)
                             
-                            % Create separate condition matrices
-                            condMatrix(ii).(tasks{i})=currDataset(i).samples(Cond(ii).idx,:);
-                            
-                            % Mean center and z-score all voxels within each trial
-                            for val=1:size(condMatrix(ii).(tasks{i}),1)
-                                condMatrix(ii).(tasks{i})(val,:) = condMatrix(ii).(tasks{i})(val,:) -...
-                                    mean(condMatrix(ii).(tasks{i})(val,:));
-                                
-                                condMatrix(ii).(tasks{i})(val,:) = ...
-                                    zscore(condMatrix(ii).(tasks{i})(val,:));
+                            switch tasks{i}
+                                case 'Enc'
+                                    encData(ii) = currDataset(i);
+                                    encData(ii).samples=encData(ii).samples(Cond(ii).(tasks{i}).idx,:);
+                                    encData(ii).sa.beta_index=encData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
+                                    encData(ii).sa.chunks=encData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
+                                    encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
+                                    encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
+                                    encData(ii).sa.targets=[1:length(Cond(ii).(tasks{i}).idx)]';
+                                case 'Ret'
+                                    retData(ii) = currDataset(i);
+                                    retData(ii).samples = retData(ii).samples(Cond(ii).(tasks{i}).idx,:);
+                                    retData(ii).sa.beta_index = retData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
+                                    retData(ii).sa.chunks = retData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
+                                    retData(ii).sa.fname = retData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
+                                    retData(ii).sa.labels = retData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
+                                    retData(ii).sa.targets = [1:length(Cond(ii).(tasks{i}).idx)]';
                             end
-                            
-                            % Use only 1 triangle of correlation matrix
-                            vectorCondSim(ii).(tasks{i}) = tril(corrcoef(condMatrix(ii).(tasks{i})),-1);
-                            
-                            % Vectorize correlation matrix
-                            vectorCondSim(ii).(tasks{i}) = reshape(vectorCondSim(ii).(tasks{i}),[],1);
-                            
-                            % Remove autocorrelations from vector
-                            vectorCondSim(ii).(tasks{i})(vectorCondSim(ii).(tasks{i})==0)=[];
-                            
                         end
+                    end
+                    
+                    % Setup DSM and searchlight arguments
+                    %DSM
+                    dsmArgs.metric = 'correlation';
+                    dsmArgs.center_data = 1;
+                    
+                    for i=1:length(Cond)
+                        
+                        % Create Target DSM from Encoding Run
+                        targetDSM(i) = cosmo_dissimilarity_matrix_measure(encData(i), dsmArgs);
+                        
+                        % Set target DSM
+                        dsmArgs.target_dsm = targetDSM(i).samples;
+                        
+                        % Searchlight ERS for each condition separately
+                        rho.(conds{i})  = cosmo_target_dsm_corr_measure(retData(i),dsmArgs);
                         
                     end
                     
-                    % Calculate Dissimilarity
-                    for i=1:length(conds)
-                        [similarityMatrix.(conds{i}), p.(conds{i})] = corrcoef(...
-                            vectorCondSim(i).(tasks{1}),vectorCondSim(i).(tasks{2}));
-                        rho.(conds{i}) = 1-similarityMatrix.(conds{i});
-                    end
-                    
-                    clear remove removeVoxels condMatrix vectorCondSim ...
-                        similarityMatrix p;
+                    clear remove removeVoxels encData retData;
                     
             end
     end
     
-            %% Save text output of SVM Classification
-            if strcmpi(analysisType,'Searchlight')==0
-                % Create a tidyverse formatted table for final statistical analysis
-                TrialTypeCombo = {strcat(conds{1,1},'_v_',conds{1,2})};
-                
-                % create subjectid and roiid columns
-                subjectid   = repmat({subject}, length(TrialTypeCombo), 1);
-                roiid       = repmat({ROI}, length(TrialTypeCombo), 1);
-                
-                switch classificationType
-                    case 'RSA'
-                        % create the stats table
-                        stats_table = table...
-                            (subjectid, roiid, TrialTypeCombo, rho(1,2));
-                    case 'ERS'
-                        % create the stats table
-                        stats_table = table...
-                            (subjectid, roiid, TrialTypeCombo, ...
-                            rho.(conds{1})(1,2), rho.(conds{2})(1,2));
-                end
-                
-                % write the stats table
-                filename = sprintf('sub-%s_roi-%s_statistics-table.csv', subject, ROI);
-                writetable(stats_table, fullfile(output_path, filename));
-                
-                %% Create aggregate table for easy viewing
-                % Create headers
-                if iteration==1
-                    
-                    switch classificationType
-                        case 'RSA'
-                            finalTable=cell(length(subjects)+1,length(rois)+2);
-                            finalTable{1,1}='subjectid';
-                            finalTable{1,2}='Trial Type';
-                            tempcount=3;
-                            
-                            for header=1:length(rois)
-                                finalTable{1,tempcount}=strcat(...
-                                    rois{1,header}(1:end-4),'_Dissimilarity');
-                                tempcount=tempcount+1;
-                            end
-                        case 'ERS'
-                            finalTable=cell(length(subjects)+1,length(rois)*2+2);
-                            finalTable{1,1}='subjectid';
-                            finalTable{1,2}='Trial Type';
-                            tempcount=3;
-                            
-                            for header=1:length(rois)
-                                finalTable{1,tempcount}=strcat(...
-                                    rois{1,header}(1:end-4),'_',conds{1,1},'_Dissimilarity');
-                                finalTable{1,tempcount+1}=strcat(...
-                                    rois{1,header}(1:end-4),'_',conds{1,2},'_Dissimilarity');
-                                tempcount=tempcount+2;
-                            end
-                    end
-                    
-                    finalTable{1,tempcount}=['num' conds{1,1}];
-                    finalTable{1,tempcount+1}=['num' conds{1,2}];
-                    
-                    row=2;
-                    header=3;
-                    clear tempcount;
-                end
-                
-                % Counter for resetting to next row. Uses remainder from divison of
-                % region counter over total (e.g. 1/14) to check data should be
-                % read into next subject line/row.
-                iterCheck=mod(iteration,length(rois));
-                
-                % Add subject, trial type, and accuracy to table
-                finalTable{row,1}=subject;
-                finalTable{row,2}=TrialTypeCombo{1,1};
-                switch classificationType
-                    case 'RSA'
-                        finalTable{row,header}=currDatasetDSM.samples;
-                        header=header+1;
-                    case 'ERS'
-                        finalTable{row,header}=rho.(conds{1})(1,2);
-                        finalTable{row,header+1}=rho.(conds{2})(1,2);
-                        
-                        header=header+2;
-                end
-                
-                % Drops to next row if remainder is 0 (e.g. all regions have been
-                % entered for a given subject)
-                if iterCheck == 0
-                    finalTable{row,header}=num2str(length(Cond(1).idx));
-                    finalTable{row,header+1}=num2str(length(Cond(2).idx));
-                    row=row+1;
-                    header=3;
-                end
-                
-            end
-    end
-    
-    % Save mat file with statistics separately
-    save([out_path '_' classificationType filesep 'finalTable.mat'],'finalTable');
-    
-    %% Save summary files of RSA.
+    %% Save text output of SVM Classification
     if strcmpi(analysisType,'Searchlight')==0
+        % Create a tidyverse formatted table for final statistical analysis
+        TrialTypeCombo = {strcat(conds{1,1},'_v_',conds{1,2})};
         
-        % Write output summary file
-        file = fopen([out_path '_' classificationType filesep 'allAccuraciesSummary.csv'], 'w');
+        % create subjectid and roiid columns
+        subjectid   = repmat({subject}, length(TrialTypeCombo), 1);
+        roiid       = repmat({ROI}, length(TrialTypeCombo), 1);
         
-        for a=1:size(finalTable,1)
-            for b=1:size(finalTable,2)
-                var = eval('finalTable{a,b}');
-                try
-                    fprintf(file, '%s', var);
-                end
-                fprintf(file, ',');
-            end
-            fprintf(file, '\n');
+        switch classificationType
+            case 'RSA'
+                % create the stats table
+                stats_table = table...
+                    (subjectid, roiid, TrialTypeCombo, rho(1,2));
+            case 'ERS'
+                % create the stats table
+                stats_table = table...
+                    (subjectid, roiid, TrialTypeCombo, ...
+                    rho.(conds{1}).samples, rho.(conds{2}).samples);
+                %rho.(conds{1})(1,2), rho.(conds{2})(1,2));
         end
         
-        fclose(file);
-        clear;
+        % write the stats table
+        filename = sprintf('sub-%s_roi-%s_statistics-table.csv', subject, ROI);
+        writetable(stats_table, fullfile(output_path, filename));
+        
+        %% Create aggregate table for easy viewing
+        % Create headers
+        if iteration==1
+            
+            switch classificationType
+                case 'RSA'
+                    finalTable=cell(length(subjects)+1,length(rois)+2);
+                    finalTable{1,1}='subjectid';
+                    finalTable{1,2}='Trial Type';
+                    tempcount=3;
+                    
+                    for header=1:length(rois)
+                        finalTable{1,tempcount}=strcat(...
+                            rois{1,header}(1:end-4),'_Dissimilarity');
+                        tempcount=tempcount+1;
+                    end
+                case 'ERS'
+                    finalTable=cell(length(subjects)+1,length(rois)*2+2);
+                    finalTable{1,1}='subjectid';
+                    finalTable{1,2}='Trial Type';
+                    tempcount=3;
+                    
+                    for header=1:length(rois)
+                        finalTable{1,tempcount}=strcat(...
+                            rois{1,header}(1:end-4),'_',conds{1,1},'_Dissimilarity');
+                        finalTable{1,tempcount+1}=strcat(...
+                            rois{1,header}(1:end-4),'_',conds{1,2},'_Dissimilarity');
+                        tempcount=tempcount+2;
+                    end
+            end
+            
+            finalTable{1,tempcount}=['num' conds{1,1}];
+            finalTable{1,tempcount+1}=['num' conds{1,2}];
+            
+            row=2;
+            header=3;
+            clear tempcount;
+        end
+        
+        % Counter for resetting to next row. Uses remainder from divison of
+        % region counter over total (e.g. 1/14) to check data should be
+        % read into next subject line/row.
+        iterCheck=mod(iteration,length(rois));
+        
+        % Add subject, trial type, and accuracy to table
+        finalTable{row,1}=subject;
+        finalTable{row,2}=TrialTypeCombo{1,1};
+        switch classificationType
+            case 'RSA'
+                finalTable{row,header}=currDatasetDSM.samples;
+                header=header+1;
+            case 'ERS'
+                %finalTable{row,header}=rho.(conds{1})(1,2);
+                %finalTable{row,header+1}=rho.(conds{2})(1,2);
+                
+                finalTable{row,header}=rho.(conds{1}).samples;
+                finalTable{row,header+1}=rho.(conds{2}).samples;
+                
+                header=header+2;
+        end
+        
+        % Drops to next row if remainder is 0 (e.g. all regions have been
+        % entered for a given subject)
+        if iterCheck == 0
+            finalTable{row,header}=num2str(length(Cond(1).(tasks{i}).idx));
+            finalTable{row,header+1}=num2str(length(Cond(2).(tasks{i}).idx));
+            row=row+1;
+            header=3;
+        end
+        
     end
+end
+
+% Save mat file with statistics separately
+save([out_path '_' classificationType filesep 'finalTable.mat'],'finalTable');
+
+%% Save summary files of RSA.
+if strcmpi(analysisType,'Searchlight')==0
+    
+    % Write output summary file
+    file = fopen([out_path '_' classificationType filesep 'allAccuraciesSummary.csv'], 'w');
+    
+    for a=1:size(finalTable,1)
+        for b=1:size(finalTable,2)
+            var = eval('finalTable{a,b}');
+            try
+                fprintf(file, '%s', var);
+            end
+            fprintf(file, ',');
+        end
+        fprintf(file, '\n');
+    end
+    
+    fclose(file);
+    clear;
+end
