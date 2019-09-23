@@ -49,34 +49,28 @@ end
 
 % Filepath for results folder
 parentDir = fileparts(study_path);
-if ~exist('subConds','var')
-    switch analysisType
-        case 'Searchlight'
-            analysis = strcat...
-                (analysisName,'_Searchlight_Results_',...
-                conds{1,1},'_',conds{1,2});
-        otherwise
-            analysis = strcat...
-                (analysisName,'_Results_',...
-                conds{1,1},'_',conds{1,2});
-    end
-else
-    switch analysisType
-        case 'Searchlight'
-            analysis = strcat...
-                (analysisName,'_Searchlight_Results_',...
-                conds{1,1},'_',conds{1,2},'_',subConds{1,1});
-        otherwise
-            analysis = strcat...
-                (analysisName,'_Results_',...
-                conds{1,1},'_',conds{1,2},'_',subConds{1,1});
-    end
+
+% Base output directory name
+switch analysisType
+    case 'Searchlight'
+        analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+            analysisType,'_',trialAnalysis,'_',metric,'_',...
+            num2str(searchlightSize),'_',conds{1,1},'_',conds{1,2});
+    otherwise
+        if exist('subConds','var')
+            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',...
+                conds{1,2},'_',subConds{1,1},'_',subConds{1,2});
+        else
+            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',conds{1,2});
+        end
 end
 
-if exist('trialAnalysis','var')
-    out_path = fullfile(parentDir, [analysis '_' trialAnalysis]);
-else
-    out_path = fullfile(parentDir, analysis);
+% Bootstrap flag
+switch bootstrap.flag
+    case 'Yes'
+        analysis = [analysis '_Bootstrap'];
 end
 
 %% Main Body
@@ -104,13 +98,7 @@ for iteration=1:length(subjects)*length(rois)
     %                 :beta appended to the end tells cosmo to pull the beta
     %                 information from the SPM.mat file.
     data_path   = fullfile(study_path, subject);
-    switch bootstrap.flag
-        case 'Yes'
-            output_path = fullfile(...
-                [out_path '_' classType '_Bootstrap'], subject);
-        case 'No'
-            output_path = fullfile([out_path '_' classType], subject);
-    end
+    output_path = fullfile(out_path, subject);
     spm_fn = [data_path '/SPM.mat'];
     
     % create the output path if it doesn't already exist
