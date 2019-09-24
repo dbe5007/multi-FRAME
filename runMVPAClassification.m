@@ -30,13 +30,13 @@
 %% Pre-Analysis Setup
 
 % Add CoSMoMVPA to the MATLAB search path
-addpath(genpath('/path/to/CoSMoToolbox'));
+%addpath(genpath('/path/to/CoSMoToolbox'));
 
 % Required for boostrap code to function
 addpath('/path/to/CANLab-Multivariate-Scripts/cosmo_crossvalidate_bootstrap.m');
 
 % turn cosmo warnings off
-cosmo_warning('off');
+%cosmo_warning('off');
 
 %% Set Analysis Parameters & Paths
 % Load subject IDs, ROIs, and Condition flags
@@ -937,6 +937,25 @@ try
                     fprintf(file, '\n');
                 end
                 fclose(file);
+                
+                %Run R Markdown graph
+                try
+                    curDir = pwd;
+                    
+                    cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
+                        '''; knit(''anovaGraphOnlyMarkdown.Rmd'', ''anovaGraphOnlyMarkdown.html'')"'];
+                    
+                    [status,cmdout] = system(cmd);
+                    
+                    % Move HTML to output folder
+                    setenv('dataPath',analysis);
+                    setenv('curDir',curDir);
+                    
+                    !mv -t $dataPath $curDir/anovaGraphOnlyMarkdown.html figure/
+                catch
+                    message('Unable to save table and figure!');
+                end
+                
             case 'Yes'
                 % Save comparison of permuted and true accuracy to CSV file
                 file = fopen([fileparts(output_path) filesep  'permAccuraciesSummary.csv'], 'w');
