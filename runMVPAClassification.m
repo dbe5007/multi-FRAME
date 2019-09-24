@@ -30,10 +30,10 @@
 %% Pre-Analysis Setup
 
 % Add CoSMoMVPA to the MATLAB search path
-%addpath(genpath('/path/to/CoSMoToolbox'));
+addpath(genpath('/path/to/CoSMoToolbox'));
 
 % Required for boostrap code to function
-addpath('/path/to/CANLab-Multivariate-Scripts/cosmo_crossvalidate_bootstrap.m');
+addpath('/path/to/CANLab-Multivariate-Scripts/functions/cosmo_crossvalidate_bootstrap.m');
 
 % turn cosmo warnings off
 %cosmo_warning('off');
@@ -940,18 +940,20 @@ try
                 
                 %Run R Markdown graph
                 try
+                    % Directory variables
                     curDir = pwd;
+                    markdown = which('anovaGraphOnlyMarkdown.r');
                     
+                    % Call R script from command line
                     cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
-                        '''; knit(''anovaGraphOnlyMarkdown.Rmd'', ''anovaGraphOnlyMarkdown.html'')"'];
-                    
+                        '''; knit(''' markdown ''', ''anovaGraphOnlyMarkdown.html'')"'];
                     [status,cmdout] = system(cmd);
                     
                     % Move HTML to output folder
                     setenv('dataPath',analysis);
                     setenv('curDir',curDir);
+                    !mv -t $dataPath $curDir/analyses/anovaGraphOnlyMarkdown.html figure/
                     
-                    !mv -t $dataPath $curDir/anovaGraphOnlyMarkdown.html figure/
                 catch
                     message('Unable to save table and figure!');
                 end
