@@ -1,0 +1,72 @@
+---
+title: "Graph of Classification Accuracy"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+Load Packages and Read in Subject CSV files
+
+```{r, message=FALSE, warning = FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(broom)
+library(grid)
+library(gridExtra)
+
+filelist = list.files(path = dataPath[1], recursive = TRUE, pattern = "table.csv", full.names = TRUE)
+
+#assuming tab separated values with a header    
+datalist = lapply(filelist, function(x)read.table(x, header=T, sep = ",")) 
+
+#assuming the same header/columns for all files
+classAccuracies = do.call("rbind", datalist) 
+```
+
+## One-Way ANOVA
+
+Read accuracies into new table and compute ANOVA against chance (50%)
+
+```{r, message=FALSE, warning = FALSE, fig.align = 'center'}
+# Change variable types from integer to text
+classAccuracies$subjectid = as.character(classAccuracies$subjectid)
+classAccuracies$TrialTypeCombo = as.character(classAccuracies$TrialTypeCombo)
+
+options(scipen=999) #Gers rid of scientific notation
+
+classAccuraciesCov<-classAccuracies %>%                    #Create table named classAccuraciesCov
+  group_by(roiid) %>%                                      #Within each ROI,
+  summarise(pval = list(tidy(t.test(accuracy, mu=.5))),    #Perform a 1s t-test against chance, 
+            sdAcc = sd(accuracy)) %>%                      #Then take sd of classifier acc,
+  unnest() %>%                                             #Turn list to column,
+  mutate_if(is.numeric, ~round(., 4))                      #Round variables to the fourth decimal, and
+
+# Plot Table
+classAccuraciesPlot = classAccuraciesCov[,c(1:5,7)]
+colnames(classAccuraciesPlot) <- c("regionID", "avgClassAcc", "t-stat","pVal","N","maxAcc")
+grid.table(classAccuraciesPlot)
+```
+
+##Figure
+
+Plot Group Accuracies with SEM
+
+```{r, message=FALSE, warning = FALSE, fig.align = 'center'}
+classAccuracies %>%
+  ggplot(aes(x = roiid, y = accuracy, fill = roiid)) +                        				#Create plot
+  stat_summary(geom = "bar", fun.y = mean, position = "dodge") +              				#Average classifier accuracy to make bars
+  stat_summary(geom = "errorbar", fun.data = mean_se, position = "dodge") +   				#Get SEM and display as error bars
+  coord_cartesian(ylim = c(min(classAccuraciesCov$conf.low), max(classAccuraciesCov$conf.high))) + 	#Set axis limits to min/max accuracies
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),                    				#Here down is all formatting
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  ggtitle(paste("Classification Accuracy For ", classAccuracies$TrialTypeCombo[1], sep="")) + 
+  ylab("Classification Accuracy") + 
+  geom_hline(yintercept=c(.5), linetype="dotted")
+```
