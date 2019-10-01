@@ -28,10 +28,10 @@ Requires behavioral file to load and tag trial type information
 Below is order of scripts to be run in the pipeline assuming a new data project:
 
 
-1. ```createParams.m```          - Dialog will come up querying if Specify/Estimate has been run. Select 'No' and a temporary params file will be created to be used for Specify & Estimate scripts (```specify_AnalysisName_model_params.mat```)
-2. ```specifyModel.m```          - Run using ```specify_model_params.mat``` as input.
-3. ```estimateModel.m```         - Run using ```specify_model_params.mat``` as input.
-4. ```createParams.m```          - Rerun choosing 'Yes' at Specify/Estimate question. File ```specify_model_params.mat``` will be deleted. Provide input to addition dialog boxes as needed.
+1. ```createParams.m```          - Dialog box querying if Specify/Estimate has been run. Select 'No' and a temporary params file will be created to be used for Specify & Estimate scripts (```specify_AnalysisName_model_params.mat```)
+2. ```specifyModel.m```          - Run using ```specify_AnalysisName_model_params.mat``` as input.
+3. ```estimateModel.m```         - Run using ```specify_AnalysisName_model_params.mat``` as input.
+4. ```createParams.m```          - Rerun choosing 'Yes' at Specify/Estimate question. File ```specify_AnalysisName_model_params.mat``` will be deleted. Provide input to addition dialog boxes as needed.
 5. ```eunMVPAClassification.m``` - Perform MVPA classification using final params file created from ```createParams.m``` script (e.g. ```params_AnalysisName_Condition1_Condtion2.mat```)
 
 
