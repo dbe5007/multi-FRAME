@@ -33,7 +33,8 @@
 addpath(genpath('/path/to/CoSMoToolbox'));
 
 % Required for boostrap code to function
-addpath('/path/to/CANLab-Multivariate-Scripts/functions/cosmo_crossvalidate_bootstrap.m');
+%addpath('/path/to/CANLab-Multivariate-Scripts/functions/cosmo_crossvalidate_bootstrap.m');
+addpath(fileparts(which('cosmo_crossvalidate_bootstrap.m')));
 
 % turn cosmo warnings off
 %cosmo_warning('off');
@@ -119,39 +120,43 @@ for iteration=1:length(subjects)*length(rois)
     % Remove constant features
     currDataset=cosmo_remove_useless_data(currDataset);
     
-    switch regressRT
+    switch regressRT.flag
         case 'Yes'
-            
             files = dir([study_path filesep subject filesep 'Run*']);
-            
             for i=1:length(files)
-                load([files(i).folder filesep files(i).name]);
-                if i==1
-                    %RT = RT';
-                    RT = onsets';
-                else
-                    %RT = [RT; RT'];
-                    RT = [RT; onsets'];
+                curMat(i) = load([files(i).folder filesep files(i).name]);
+                if i==length(files)
+                    rtCell = [curMat.RT];
+                    
+                    % Convert from cell to double for regression
+                    for ii=1:length(rtCell)
+                        
+                        % Flag outlier RT greater than 4 seconds
+                        if double(rtCell{ii}) >= regressRT.trialSec
+                            rtDouble(ii,1) = regressRT.trialSec;
+                        else
+                            rtDouble(ii,1) = double(rtCell{ii});
+                        end
+                    end
+                    
+                    % Replace with trial duration (set in params)
+                    rtDouble(isnan(rtDouble))=regressRT.trialSec;
                 end
             end
             
-            %Debug
-            for i=1:length(RT)
-                RT2(i,1) = double(RT{i});
-            end
-            
             for i=1:length(currDataset.samples)
-               model = LinearModel.fit(RT,currDataset.samples(:,1));
-               if i==1
-                   allResiduals = model.Residuals.Raw;
-               else
-                   allResiduals = [allResiduals model.Residuals.Raw];
-               end
+                model = LinearModel.fit(rtDouble,currDataset.samples(:,i));
+                if i==1
+                    allResiduals = model.Residuals.Raw;
+                else
+                    allResiduals = [allResiduals model.Residuals.Raw];
+                end
             end
             
             zscoreResid = zscore(allResiduals);
             currDataset.samples = zscoreResid;
             
+            clear files curMat rtCell rtDouble model allResiduals zscoreResid;
     end
     
     %%% Test/Train Flag

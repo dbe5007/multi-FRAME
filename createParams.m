@@ -93,11 +93,15 @@ switch stepFlag
         
         % Account for RT/regress out. No is default
         if exist('commandFlag','var')==0
-            regressRT = questdlg('Regress out Reaction Time (RT)?',...
+            regressRT.flag = questdlg('Regress out Reaction Time (RT)?',...
                 'Confirm Regression',...
                 'Yes','No','Cancel','No');
+            
+            % Set Trial Duration in seconds
+            regressRT.trialSec = 4;
         else
-            regressRT = 'No';
+            regressRT.flag = 'No';
+            regressRT.trialSec = 4;
         end
         
         switch analysisType
