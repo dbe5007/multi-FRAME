@@ -47,13 +47,11 @@ else
     analysisName = 'TaskA';
 end
 
-server_path   = '/path/to/main/project/folder';
-project_path  = [server_path filesep 'RSA'];
-setenv('project_path',project_path);
+serverPath  = '/path/to/main/project/folder';
+projectPath = [serverPath filesep 'RSA' filesep];
+studyPath   = [projectPath filesep 'models/unsmoothed/SingleTrialModel' analysisName];
+setenv('project_path',projectPath);
 !mkdir -p $project_path
-
-study_path    = [project_path filesep ...
-    'models/unsmoothed/SingleTrialModel' analysisName];
 
 % Select analysis type. No searchlight is default
 if exist('commandFlag','var')==0
@@ -106,7 +104,7 @@ switch stepFlag
         
         switch analysisType
             case 'Searchlight'
-                roi_path    = [project_path 'ROIs/searchlight'];
+                roi_path    = [projectPath 'ROIs/searchlight'];
                 searchlight = 'Yes';
             otherwise
                 roi_path    = '/path/to/common/mask/folder';
@@ -138,17 +136,17 @@ try
                     
             end
             
-            server_path   = '/path/to/server';
-            project_name  = 'projectName';
+            serverPath   = '/path/to/server';
+            projectName  = 'projectName';
             
             % Parameters for model estimation
             Analysis.name            = ['SingleTrialModel' analysisName];
-            Analysis.directory       = study_path;
-            Analysis.behav.directory = [server_path filesep project_name '/NameOfBehavioralFolder'];
+            Analysis.directory       = studyPath;
+            Analysis.behav.directory = [serverPath filesep projectName '/NameOfBehavioralFolder'];
             
-            Func.dir         = [server_path filesep project_name filesep funcDir];
+            Func.dir         = [serverPath filesep projectName filesep funcDir];
             Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [server_path filesep project_name filesep funcDir];
+            Mot.dir          = [serverPath filesep projectName filesep funcDir];
             Func.motwildcard = '^rp_.*\.txt';
             
             % Each study is different, with a unique TR and a unique onset and
@@ -166,7 +164,7 @@ try
             Mask.dir  = 'path\to\mask\directory';
             Mask.name = 'name_of_mask.nii';
             
-            folders = dir([server_path filesep project_name filesep funcDir]);
+            folders = dir([serverPath filesep projectName filesep funcDir]);
             
             for i=1:length(folders)
                 subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
@@ -178,7 +176,7 @@ try
                 Subjects{i,1}=erase(folders(i).name,'_spm12');
             end
             
-            filename=strcat(project_path,'specify_',analysisName,'_model_params.mat');
+            filename=strcat(projectPath,'specify_',analysisName,'_model_params.mat');
             
             save(filename,'analysisName','project_path','study_path',...
                 'server_path','project_name','Analysis','funcDir',...
@@ -296,7 +294,7 @@ try
                             'ListSize',[280,300]);
                         tasks=tasks(index);
                         
-                        save([project_path 'vars/tasks.mat'],'tasks');
+                        save([projectPath 'vars/tasks.mat'],'tasks');
                 end
                 
             catch
@@ -312,7 +310,7 @@ end
 
 try
     % List subject directory
-    subjDir=dir(study_path);
+    subjDir=dir(studyPath);
     
     % Remove non-subject directories & possible files in directory
     for i=1:length(subjDir)
@@ -326,7 +324,7 @@ try
     end
     
     !mkdir -p $project_path/vars
-    save([project_path 'vars/subjects.mat'],'subjects');
+    save([projectPath 'vars/subjects.mat'],'subjects');
     
     clear subjCount i subjDir;
 catch
@@ -345,7 +343,7 @@ try
         
         switch conditionFlag
             case 'Yes'
-                load([project_path 'vars/conds.mat']);
+                load([projectPath 'vars/conds.mat']);
             case 'No'
                 conds={'ConditionA','ConditionB','ConditionC','ConditionD'};
                 
@@ -355,18 +353,18 @@ try
                     'ListSize',[280,300]);
                 conds=conds(index);
                 
-                save([project_path 'vars/conds.mat'],'conds');
+                save([projectPath 'vars/conds.mat'],'conds');
         end
         
         switch subconditionFlag
             case 'Yes'
-                load([project_path 'vars/subConds.mat']);
+                load([projectPath 'vars/subConds.mat']);
         end
         
     else
-        load([project_path 'vars/conds.mat']);
-        if exist([project_path 'vars/subConds.mat'],'file')
-            load([project_path 'vars/subConds.mat']);
+        load([projectPath 'vars/conds.mat']);
+        if exist([projectPath 'vars/subConds.mat'],'file')
+            load([projectPath 'vars/subConds.mat']);
         end
     end
 catch
@@ -387,13 +385,13 @@ try
     else
         switch searchlight
             case 'Yes'
-                if ~exist([project_path 'vars/rois_searchlight.mat'],'file')
+                if ~exist([projectPath 'vars/rois_searchlight.mat'],'file')
                     resliceFlag='No';
                 else
                     resliceFlag='Yes';
                 end
             otherwise
-                if ~exist([project_path 'vars/rois.mat'],'file')
+                if ~exist([projectPath 'vars/rois.mat'],'file')
                     resliceFlag='No';
                 else
                     resliceFlag='Yes';
@@ -405,15 +403,15 @@ try
         case 'Yes'
             switch searchlight
                 case 'Yes'
-                    load([project_path 'vars/rois_searchlight.mat']);
+                    load([projectPath 'vars/rois_searchlight.mat']);
                 otherwise
-                    load([project_path 'vars/rois.mat']);
+                    load([projectPath 'vars/rois.mat']);
             end
         case 'No'
             
             % Get subject directories
             % dataDir=[study_path filesep subjects{1} filesep 'beta_0001.nii'];
-            dataDir = [server_path funcDir filesep subjects{1}...
+            dataDir = [serverPath funcDir filesep subjects{1}...
                 '_spm12' filesep 'run1encoding' filesep 'warun1encoding.nii'];
             
             % Load in lab ROIs
@@ -467,7 +465,7 @@ try
             for i=1:length(regions)
                 datainput=maskList{i};
                 reference=dataDir;
-                output=strcat(project_path,roiPrefix,regions{i});
+                output=strcat(projectPath,roiPrefix,regions{i});
                 
                 % Set system/terminal variables
                 setenv('region',regions{i});
@@ -488,14 +486,14 @@ try
             
     end
     
-    roi_path = [project_path 'ROIs'];
+    roi_path = [projectPath 'ROIs'];
     
     % Save roi list to separate .mat file
     switch searchlight
         case 'Yes'
-            save([project_path 'vars/rois_searchlight.mat'],'rois');
+            save([projectPath 'vars/rois_searchlight.mat'],'rois');
         otherwise
-            save([project_path 'vars/rois.mat'],'rois');
+            save([projectPath 'vars/rois.mat'],'rois');
     end
 catch
     warning('Unable to create region list. Set to debug mode.');
@@ -509,20 +507,20 @@ try
         case 'MVPA'
             switch analysisType
                 case 'Searchlight'
-                    filename=strcat(project_path,'params_',...
+                    filename=strcat(projectPath,'params_',...
                             analysisName,'_',classType,'_',...
                             analysisType,'_',trialAnalysis,'_',...
                             metric,'_',num2str(searchlightSize),'_',...
                             conds{1,1},'_',conds{1,2},'.mat');
                 otherwise
                     if exist('subConds','var')
-                        filename=strcat(project_path,'params_',...
+                        filename=strcat(projectPath,'params_',...
                             analysisName,'_',classType,'_',...
                             analysisType,'_',trialAnalysis,'_',...
                             conds{1,1},'_',conds{1,2},'_',...
                             subConds{1,1},'_',subConds{1,2},'.mat');
                     else
-                        filename=strcat(project_path,'params_',...
+                        filename=strcat(projectPath,'params_',...
                             analysisName,'_',classType,'_',...
                             analysisType,'_',trialAnalysis,'_',...
                             conds{1,1},'_',conds{1,2},'.mat');
@@ -530,14 +528,14 @@ try
             end
         case 'RSA'
             if exist('subConds','var')
-                filename=strcat(project_path,'params_',...
+                filename=strcat(projectPath,'params_',...
                     analysisName,'_',classificationType,'_',...
                     analysisType,'_',trialAnalysis,'_',...
                     conds{1,1},'_',conds{1,2},'_',...
                     subConds{1,1},'_',subConds{1,2},'.mat');
             else
                 
-                filename=strcat(project_path,'params_',...
+                filename=strcat(projectPath,'params_',...
                     analysisName,'_',classificationType,'_',...
                     analysisType,'_',trialAnalysis,'_',...
                     conds{1,1},'_',conds{1,2},'.mat');

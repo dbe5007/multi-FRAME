@@ -257,6 +257,7 @@ for iteration=1:length(subjects)*length(rois)
                     
                     % Calculate separate matrices for each condition & compare
                     % those
+                    
                     switch trialAnalysis
                         case 'Individual'
                             % Split dataset into separate condition
