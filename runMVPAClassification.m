@@ -78,7 +78,7 @@ end
 for iteration=1:length(subjects)*length(rois)
     
     % Loop count for all subject/region combinations
-    if iteration==1
+    if iteration==-1
         subjCount=1;
         regionCount=1;
     elseif mod(iteration,length(rois))==mod(1,length(rois))
@@ -107,8 +107,11 @@ for iteration=1:length(subjects)*length(rois)
         mkdir(output_path)
     end
     
-    % path to current region mask
+    % Path to current region mask
     curROI = fullfile(roi_path, ROI);
+    
+    % Current region name
+    regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
     
     %%% Loading ROI data into CosmoMVPA - use SPM betas
     % Note that loading data through the SPM.mat file will automatically
@@ -242,84 +245,6 @@ for iteration=1:length(subjects)*length(rois)
     % distributed).
     partitions = cosmo_nfold_partitioner(currDataset);
     
-    %%% Trial Level Classification - Deprecated
-%     if exist('leaveRuns','var')
-%         if strcmpi(leaveRuns,'Two')
-%             try
-%                 
-%                 if exist('subConds','var')
-%                     
-%                     subConds{1,2}=[];
-%                     subConds={subConds{1,1}};
-%                     
-%                     for ii=1:length(conds)
-%                         
-%                         subCond.(conds{1,ii})=contains(currDataset.sa.labels, conds{1,ii});
-%                         counter=1;
-%                         
-%                         for iii=1:length(subConds)
-%                             subCond.(conds{1,ii})(:,counter+1)=contains...
-%                                 (currDataset.sa.labels, subConds{1,iii});
-%                             counter=counter+1;
-%                         end
-%                         
-%                         subCond.(conds{1,ii})=double(subCond.(conds{1,ii}));
-%                         subCond.(conds{1,ii})(:,counter+1)=sum(subCond.(conds{1,ii})(:,1:counter),2);
-%                         
-%                     end
-%                     
-%                     Cond1idx = find(subCond.(conds{1,1})(:,counter+1) == counter);
-%                     Cond2idx = find(subCond.(conds{1,2})(:,counter+1) == counter);
-%                     
-%                 else
-%                     
-%                     Cond1 = ~cellfun(@isempty, strfind(currDataset.sa.labels, conds{1,1}));
-%                     Cond1idx = find(Cond1 == 1);
-%                     Cond2 = ~cellfun(@isempty, strfind(currDataset.sa.labels, conds{1,2}));
-%                     Cond2idx = find(Cond2 == 1);
-%                     
-%                 end
-%                 
-%                 %if iteration == 1
-%                 if regionCount == 1
-%                     
-%                     if length(Cond1idx)<=length(Cond2idx)
-%                         condA=Cond1idx;
-%                         condB=Cond2idx;
-%                     else
-%                         condA=Cond2idx;
-%                         condB=Cond1idx;
-%                     end
-%                     
-%                     condB = datasample(condB,length(condA),'Replace',false);
-%                     condA = condA(randperm(length(condA)));
-%                     
-%                     save([output_path filesep 'randomizedTargetPairs.mat'],...
-%                         'condA','condB');
-%                     
-%                 end
-%                 
-%                 partitions = struct();
-%                 
-%                 for i=1:length(condA)
-%                     partitions.test_indices{1,i} = [condA(i);condB(i)];
-%                     
-%                     tempA = condA;
-%                     tempA(i) = [];
-%                     
-%                     tempB = condB;
-%                     tempB(i) = [];
-%                     
-%                     partitions.train_indices{i} = [ tempA; tempB ];
-%                     
-%                     clear tempA tempB
-%                 end
-%             end
-%             
-%         end
-%     end
-    
-    
     %%% Test/Train Flag
     % If set to 'Trial', partitions will not be balanced. Balancing is not
     % possible for 'Trial' as n-1 trials are used to train and tested on
@@ -357,44 +282,53 @@ for iteration=1:length(subjects)*length(rois)
             % Set partition scheme.
             opt.partitions = partitions;
             
-            % Define a neighborhood with approximately 100 voxels in each
-            % searchlight.
-            metric = 'radius';
-            nbrhood=cosmo_spherical_neighborhood(currDataset,metric,...
-                searchlightSize);
-            
-            %%% Test/Train Flag
-            % If set to 'Trial', partitions are not checked for balance
-            % because they cannot be. Code will crash/not classify if
-            % balancing is not set to be ignored.
-            switch trialAnalysis
-                case 'Trial'
-                    opt.check_partitions=false;
+            try
+                % Define a neighborhood with approximately 100 voxels in 
+                % each searchlight.
+                nbrhood=cosmo_spherical_neighborhood(currDataset,metric,...
+                    searchlightSize);
+                
+                %%% Test/Train Flag
+                % If set to 'Trial', partitions are not checked for balance
+                % because they cannot be. Code will crash/not classify if
+                % balancing is not set to be ignored.
+                switch trialAnalysis
+                    case 'Trial'
+                        opt.check_partitions=false;
+                end
+                
+                % Run the searchlight
+                searchResults = cosmo_searchlight...
+                    (currDataset,nbrhood,measure,opt);
+                save([output_path '/searchlightResults_' regionName '_' metric '_' ...
+                    num2str(searchlightSize) '.mat'],'searchResults');
+                
+                % print output dataset
+                fprintf('Dataset output:\n');
+                
+                % Define output location
+                if ~exist('subConds','var')
+                    output=strcat(output_path,'/',subject,'_',...
+                        classifier.name,'_Searchlight_',regionName,'_',...
+                        metric,'_',num2str(searchlightSize),'_',...
+                        conds{1,1},'_vs_',conds{1,2},'.nii');
+                else
+                    output=strcat(output_path,'/',subject,'_',...
+                        classifier.name,'_Searchlight_',regionName,'_',...
+                        metric,'_',num2str(searchlightSize),'_',...
+                        conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
+                end
+                
+                % Store results to disc
+                cosmo_map2fmri(searchResults, output);
+                
+                % Gunzip output to save space
+                setenv('output',output);
+                !gzip $output
+            catch ME
+                disp([ME.message ' Unable to create searchlight for ' ...
+                    regionName '!']);
             end
-            
-            % Run the searchlight
-            searchResults = cosmo_searchlight(currDataset,nbrhood,measure,opt);
-            save([output_path '/searchlightResults_' metric '_' ...
-                num2str(searchlightSize) '.mat'],'searchResults');
-            
-            % print output dataset
-            fprintf('Dataset output:\n');
-            
-            % Define output location
-            if ~exist('subConds','var')
-                output=strcat(output_path,'/',subject,'_',...
-                    classifier.name,'_Searchlight_',metric,'_',...
-                    num2str(searchlightSize),'_',...
-                    conds{1,1},'_vs_',conds{1,2},'.nii');
-            else
-                output=strcat(output_path,'/',subject,'_',...
-                    classifier.name,'_Searchlight_',metric,'_',...
-                    num2str(searchlightSize),'_',...
-                    conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
-            end
-            
-            % Store results to disc
-            cosmo_map2fmri(searchResults, output);
             
         otherwise
             % This analysis calculates classification accuracy using all
@@ -494,7 +428,7 @@ for iteration=1:length(subjects)*length(rois)
                     % Run Standard SVM classification with no bootstrap
             end
             
-            regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
+            %regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
             try
                 [predictions,accuracy] = cosmo_crossvalidate...
                     (currDataset,classifier.function,partitions,opt);
@@ -507,7 +441,7 @@ for iteration=1:length(subjects)*length(rois)
             end
             
             finalPredictions(:,regionCount) = predictions;
-            clear predictions;  
+            clear predictions;
     end
     
     %% Calculating Classification Accuracy
