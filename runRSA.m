@@ -639,7 +639,6 @@ for iteration=1:length(subjects)*length(rois)
                                     encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
                                     encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
                                     encData(ii).sa.targets=encData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
-                                    %encData(ii).sa.targets=[1:length(Cond(ii).(tasks{i}).idx)]';
                                 case 'Retrieval'
                                     retData(ii) = currDataset(i);
                                     retData(ii).samples = retData(ii).samples(Cond(ii).(tasks{i}).idx,:);
@@ -648,30 +647,11 @@ for iteration=1:length(subjects)*length(rois)
                                     retData(ii).sa.fname = retData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
                                     retData(ii).sa.labels = retData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
                                     retData(ii).sa.targets = retData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
-                                    %retData(ii).sa.targets = [1:length(Cond(ii).(tasks{i}).idx)]';
                             end
                         end
                     end
                     
-                    % Setup DSM and searchlight arguments
-                    %DSM
-%                     dsmArgs.metric = 'correlation';
-%                     dsmArgs.center_data = 1;
-
-                    
-                    
                     for i=1:length(Cond)
-                        
-%                         % Create Target DSM from Encoding Run
-%                         targetDSM(i) = cosmo_dissimilarity_matrix_measure(encData(i), dsmArgs);
-%                         
-%                         % Set target DSM
-%                         dsmArgs.target_dsm = targetDSM(i).samples;
-%                         
-%                         % Searchlight ERS for each condition separately
-%                         rho.(conds{i})  = cosmo_target_dsm_corr_measure(retData(i),dsmArgs);
-%                         
-%                         
                         
                         for j=1:length(Cond(i).Encoding.idx)
                            for k=1:length(Cond(i).Retrieval.idx)
@@ -680,47 +660,8 @@ for iteration=1:length(subjects)*length(rois)
                         end
                         
                         rho.(conds{i}) = mean(mean(corrVal));
-                        
                         clear corrVal;
-                        
-%                         % Home Code
-%                         dataMatrix(1).data = encData(i).samples;
-%                         dataMatrix(1).data = bsxfun...
-%                             (@minus,dataMatrix(1).data,mean(dataMatrix(1).data,1));
-%                         
-%                         dataMatrix(2).data = retData(i).samples;
-%                         dataMatrix(2).data = bsxfun...
-%                             (@minus,dataMatrix(2).data,mean(dataMatrix(2).data,1));
-%                         
-%                         % Within Matrix
-%                         encCorr = corr(dataMatrix(1).data',dataMatrix(1).data','Type','Pearson');
-%                         encCorr = tril(encCorr,-1);
-%                         encCorr = reshape(encCorr,[],1);
-%                         encCorr(encCorr == 0) = [];
-%                         
-%                         retCorr=corr(dataMatrix(2).data',dataMatrix(2).data','Type','Pearson');
-%                         retCorr = tril(retCorr,-1);
-%                         retCorr = reshape(retCorr,[],1);
-%                         retCorr(retCorr == 0) = [];
-%                         
-%                         % Between Matrix   
-%                         for j=1:size(dataMatrix(1).data,1)
-%                             for k=1:size(dataMatrix(2).data,1)
-%                                 tempCorr(k) = corr(dataMatrix(1).data(j,:)',dataMatrix(2).data(k,:)');
-%                             end
-%                             
-%                             %encRetCorr(:,j) = mean(tempCorr);
-%                             encRetCorr(:,j) = tempCorr;
-%                             clear tempCorr;
-%                         end
-%                         
-%                         encRetCorr = reshape(encRetCorr,[],1);
-%                         encRetCorr(encRetCorr == 0) = [];
-%                         
                     end
-                    
-%                     clear remove removeVoxels encData retData;
-                    
             end
     end
     
