@@ -67,7 +67,20 @@ echo $sub
 
 #cp $sub/*.nii Concat
 
-fslmaths $sub/*.nii -sub 0.5 Concat/$sub"_thresholded_0.5.nii"
+##Create binarized mask from results##
+fslmaths $sub/*.nii -bin $sub/$sub"_bin_mask.nii.gz"
+
+##Threshold map to 0.5 for randomise - sets chance to 50% - and threshold with binarized results##
+fslmaths $sub/*.nii -sub 0.5 $sub/$sub"_thresholded_0.5.nii.gz"
+
+#Mask with with binarized results#
+fslmaths $sub/$sub"_thresholded_0.5.nii.gz" $sub/$sub"_bin_mask.nii.gz" $sub/$sub"_thresholded_0.5_masked.nii.gz"
+
+#Fix negative 0 issue (i.e. -0) in non-searchlight voxels#
+fslmaths $sub/$sub"_thresholded_0.5_masked.nii.gz" -add 0 $sub/$sub"_thresholded_0.5_masked.nii.gz"
+
+#Copy to Concat Folder
+cp $sub/$sub"_thresholded_0.5_masked.nii.gz" Concat/$sub"_thresholded_0.5.nii"
 
 done
 
