@@ -124,16 +124,15 @@ try
                     Number.OfRows = 100;
                     suffix = 'taska';
                     runs = 5;
-                    
-                    for i=1:runs
-                        Runs{i} = ['run' num2str(i)];
-                    end
-                    
                 case 'TaskB'
                     Analysis.behav.regexp = '/*TaskBBehaviorFileName.xls';
                     Number.OfRows = 110;
                     suffix = 'taskb';
-                    
+                    runs = 5;
+            end
+            
+            for i=1:runs
+                Runs{i} = ['run' num2str(i)];
             end
             
             serverPath   = '/path/to/server';
