@@ -179,6 +179,13 @@ for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
     Model = rmfield(Model,'runs');
     Model = rmfield(Model,'directory');
     
+    load([studyPath filesep Subjects{curSub} filesep 'SPM.mat']);
+    for i=1:length(SPM.Vbeta)
+        SPM.Vbeta(i).fname = strrep(SPM.Vbeta(i).fname,'nii','nii.gz');
+    end
+    save([studyPath filesep Subjects{curSub} filesep 'SPM2.mat']);
+    
+    
 end
 
 disp('All finished!!');
