@@ -49,7 +49,7 @@ if exist('flag','var')==0
 end
 
 % Filepath for results folder
-parentDir = fileparts(study_path);
+parentDir = fileparts(studyPath);
 
 % Base output directory name
 switch analysisType
@@ -94,17 +94,18 @@ for iteration=1:length(subjects)*length(rois)
     %% Subject-Specific Directories
     
     % Current subject data paths:
-    %  data_path = fullpath to this subject's Single Trial Model directory
-    %  spm_path  = fullpath to this subject's SPM.mat file. Note: the
+    %  dataPath = fullpath to this subject's Single Trial Model directory
+    %  spmFile  = fullpath to this subject's SPM.mat file. Note: the
     %                 :beta appended to the end tells cosmo to pull the beta
     %                 information from the SPM.mat file.
-    data_path   = fullfile(study_path, subject);
-    output_path = fullfile(out_path, subject);
-    spm_fn = [data_path '/SPM.mat'];
+    dataPath   = fullfile(studyPath, subject);
+    outputPath = fullfile(analysis, subject);
+    %spmFile = [dataPath '/SPM.mat'];
+    spmFile = [data_path '/SPM_gz.mat'];
     
     % create the output path if it doesn't already exist
-    if ~exist(output_path, 'dir')
-        mkdir(output_path)
+    if ~exist(outputPath, 'dir')
+        mkdir(outputPath)
     end
     
     % Path to current region mask
@@ -117,7 +118,7 @@ for iteration=1:length(subjects)*length(rois)
     % Note that loading data through the SPM.mat file will automatically
     % "chunk" by runs, which is what we want
     fprintf('Loading data from ROI: %s\n',ROI);
-    currDataset=cosmo_fmri_dataset([spm_fn ':beta'],'mask',curROI);
+    currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
     
     %%% Tidy up the dataset
     % Remove constant features
@@ -125,7 +126,7 @@ for iteration=1:length(subjects)*length(rois)
     
     switch regressRT.flag
         case 'Yes'
-            files = dir([study_path filesep subject filesep 'Run*']);
+            files = dir([studyPath filesep subject filesep 'Run*']);
             for i=1:length(files)
                 curMat(i) = load([files(i).folder filesep files(i).name]);
                 if i==length(files)
@@ -300,7 +301,7 @@ for iteration=1:length(subjects)*length(rois)
                 % Run the searchlight
                 searchResults = cosmo_searchlight...
                     (currDataset,nbrhood,measure,opt);
-                save([output_path '/searchlightResults_' regionName '_' metric '_' ...
+                save([outputPath '/searchlightResults_' regionName '_' metric '_' ...
                     num2str(searchlightSize) '.mat'],'searchResults');
                 
                 % print output dataset
@@ -308,12 +309,12 @@ for iteration=1:length(subjects)*length(rois)
                 
                 % Define output location
                 if ~exist('subConds','var')
-                    output=strcat(output_path,'/',subject,'_',...
+                    output=strcat(outputPath,'/',subject,'_',...
                         classifier.name,'_Searchlight_',regionName,'_',...
                         metric,'_',num2str(searchlightSize),'_',...
                         conds{1,1},'_vs_',conds{1,2},'.nii');
                 else
-                    output=strcat(output_path,'/',subject,'_',...
+                    output=strcat(outputPath,'/',subject,'_',...
                         classifier.name,'_Searchlight_',regionName,'_',...
                         metric,'_',num2str(searchlightSize),'_',...
                         conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
@@ -621,7 +622,7 @@ for iteration=1:length(subjects)*length(rois)
             % write the stats table
             filename = sprintf('sub-%s_roi-%s_%s_statistics-table.csv',...
                 subject, regionName, classifier.name);
-            writetable(stats_table, fullfile(output_path, filename));
+            writetable(stats_table, fullfile(outputPath, filename));
             
             %% Create aggregate table of classification
             % Create headers
@@ -670,7 +671,7 @@ for iteration=1:length(subjects)*length(rois)
                     finalTable{row,header}=accuracy;
                     header=header+1;
                 case 'Yes'
-                    save([output_path filesep ROI '_permutedAcc.mat'],'finalAcc');
+                    save([outputPath filesep ROI '_permutedAcc.mat'],'finalAcc');
                     finalTable{row,header}=accuracy;
                     finalTable{row,header+1}=num2str(skewness(finalAcc));
                     finalTable{row,header+2}=num2str(kurtosis(finalAcc));
@@ -693,14 +694,14 @@ for iteration=1:length(subjects)*length(rois)
                 switch bootstrap.flag
                     case 'No'
                         % Save mat file with predictions separately
-                        save([output_path filesep 'finalPredictions.mat'],...
+                        save([outputPath filesep 'finalPredictions.mat'],...
                             'finalPredictions');
-                        save([output_path filesep 'finalAccuracy.mat'],'correct');
+                        save([outputPath filesep 'finalAccuracy.mat'],'correct');
                         clear finalPredictions correct;
                     case 'Yes'
-                        save([output_path filesep 'allROIPermuteACC.mat'],...
+                        save([outputPath filesep 'allROIPermuteACC.mat'],...
                             'concatAccuracy');
-                        save([output_path filesep 'finalPredAllROIs.mat'],...
+                        save([outputPath filesep 'finalPredAllROIs.mat'],...
                             'finalPred');
                         clear concatAccuracy finalPred;
                 end
@@ -717,10 +718,10 @@ try
     if strcmpi(analysisType,'Searchlight')==0
         
         % Save classifier outputs
-        save([fileparts(output_path) filesep 'finalTable.mat'],'finalTable');
+        save([fileparts(outputPath) filesep 'finalTable.mat'],'finalTable');
         switch bootstrap.flag
             case 'No'
-                save([fileparts(output_path) filesep 'finalTableTrialType.mat'],...
+                save([fileparts(outputPath) filesep 'finalTableTrialType.mat'],...
                     'finalTableTrialTypeAcc')
         end
         
@@ -810,7 +811,7 @@ try
                     % Aggregate final accuracies for all permuatations for all subjects
                     for j=1:length(subjects)
                         
-                        file = dir([fileparts(output_path) '/' subjects{j} '/' rois{i} '*']);
+                        file = dir([fileparts(outputPath) '/' subjects{j} '/' rois{i} '*']);
                         load([file.folder '/' file.name]);
                         
                         tempROI(:,j) = finalAcc;
@@ -899,7 +900,7 @@ try
                 
             case 'Yes'
                 % Save comparison of permuted and true accuracy to CSV file
-                file = fopen([fileparts(output_path) filesep  'permAccuraciesSummary.csv'], 'w');
+                file = fopen([fileparts(outputPath) filesep  'permAccuraciesSummary.csv'], 'w');
                 
                 for a=1:size(finalTableBootstrap,1)
                     for b=1:size(finalTableBootstrap,2)

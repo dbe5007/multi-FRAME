@@ -37,30 +37,31 @@ if exist('flag','var')==0
     
 end
 
-% path to save results into
+% Filepath for results folder
 parentDir = fileparts(studyPath);
-if ~exist('subConds','var')
-    switch analysisType
-        case 'Searchlight'
-            analysis = strcat...
-                (analysisName,'_Searchlight_Results_',conds{1,1},'_',conds{1,2});
-        otherwise
-            analysis = strcat...
-                (analysisName,'_Results_',conds{1,1},'_',conds{1,2});
-    end
-else
-    switch analysisType
-        case 'Searchlight'
-            analysis = strcat...
-                (analysisName,'_Searchlight_Results_',conds{1,1},'_',...
-                conds{1,2},'_',subConds{1,1});
-        otherwise
-            analysis = strcat...
-                (analysisName,'_Results_',conds{1,1},'_',...
-                conds{1,2},'_',subConds{1,1});
-    end
+
+% Base output directory name
+switch analysisType
+    case 'Searchlight'
+        analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+            analysisType,'_',trialAnalysis,'_',metric,'_',...
+            num2str(searchlightSize),'_',conds{1,1},'_',conds{1,2});
+    otherwise
+        if exist('subConds','var')
+            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',...
+                conds{1,2},'_',subConds{1,1},'_',subConds{1,2});
+        else
+            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
+                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',conds{1,2});
+        end
 end
-out_path  = fullfile(parentDir, analysis);
+
+% Bootstrap flag
+switch bootstrap.flag
+    case 'Yes'
+        analysis = [analysis '_Bootstrap'];
+end
 
 %% Main Body
 for iteration=1:length(subjects)*length(rois)
@@ -82,17 +83,17 @@ for iteration=1:length(subjects)*length(rois)
     %% Subject-Specific Directories
     
     % Current subject data paths:
-    %  data_path = fullpath to this subject's Single Trial Model directory
-    %  spm_path  = fullpath to this subject's SPM.mat file. Note: the
+    %  dataPath = fullpath to this subject's Single Trial Model directory
+    %  spmFile  = fullpath to this subject's SPM.mat file. Note: the
     %                 :beta appended to the end tells cosmo to pull the beta
     %                 information from the SPM.mat file.
-    data_path   = fullfile(studyPath, subject);
-    output_path = fullfile([out_path '_' classificationType], subject);
-    spm_fn = [data_path '/SPM.mat'];
+    dataPath   = fullfile(studyPath, subject);
+    outputPath = fullfile(analysis, subject);
+    spmFile = [dataPath '/SPM.mat'];
     
     % create the output path if it doesn't already exist
-    if ~exist(output_path, 'dir')
-        mkdir(output_path)
+    if ~exist(outputPath, 'dir')
+        mkdir(outputPath)
     end
     
     % Path to current region mask
@@ -105,7 +106,7 @@ for iteration=1:length(subjects)*length(rois)
             % Note that loading data through the SPM.mat file will automatically
             % "chunk" by runs, which is what we want
             fprintf('Loading data from ROI: %s\n',ROI);
-            currDataset=cosmo_fmri_dataset([spm_fn ':beta'],'mask',curROI);
+            currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
             
             %%% Tidy up the dataset
             % Remove constant features
@@ -316,9 +317,9 @@ for iteration=1:length(subjects)*length(rois)
                     fprintf('Loading data from ROI: %s\n',ROI);
                     for i=1:length(tasks)
                         
-                        spm_fn = [parentDir '/SingleTrialModel' tasks{i} '/' ...
+                        spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
                             subject '/SPM.mat'];
-                        currDataset(i)=cosmo_fmri_dataset([spm_fn ':beta'],'mask',curROI);
+                        currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
                         
                     end
                     
@@ -483,18 +484,18 @@ for iteration=1:length(subjects)*length(rois)
                         
                     end
                     
-                    save([output_path '/searchlightResults_' metric '_' ...
+                    save([outputPath '/searchlightResults_' metric '_' ...
                         num2str(searchlightSize) '.mat'],'results');
                     
                     for i=1:length(conds)
                         % Define output location
                         if ~exist('subConds','var')
-                            output{i}=strcat(output_path,'/',subject,...
+                            output{i}=strcat(outputPath,'/',subject,...
                                 '_ERS_Searchlight_',metric,'_',...
                                 num2str(searchlightSize),'_',...
                                 conds{i},'.nii');
                         else
-                            output=strcat(output_path,'/',subject,'_',...
+                            output=strcat(outputPath,'/',subject,'_',...
                                 classifier.name,'_Searchlight_',metric,'_',...
                                 num2str(searchlightSize),'_',...
                                 conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
@@ -510,9 +511,9 @@ for iteration=1:length(subjects)*length(rois)
                     fprintf('Loading data from ROI: %s\n',ROI);
                     for i=1:length(tasks)
                         
-                        spm_fn = [parentDir '/SingleTrialModel' tasks{i} '/' ...
+                        spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
                             subject '/SPM.mat'];
-                        currDataset(i)=cosmo_fmri_dataset([spm_fn ':beta'],'mask',curROI);
+                        currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
                         
                     end
                     
@@ -662,6 +663,8 @@ for iteration=1:length(subjects)*length(rois)
                         rho.(conds{i}) = mean(mean(corrVal));
                         clear corrVal;
                     end
+                    
+                    clear currDataset removeVoxels encData retData
             end
     end
     
@@ -686,7 +689,7 @@ for iteration=1:length(subjects)*length(rois)
                 
                 % write the stats table
                 filename = sprintf('sub-%s_roiid-%s_statistics-table.csv', subject, ROI);
-                writetable(stats_table, fullfile(output_path, filename));
+                writetable(stats_table, fullfile(outputPath, filename));
             case 'ERS'
                 % Create subjectid and roiid columns
                 TrialTypeCombo = {strcat(tasks{1},'_v_',tasks{2})};
@@ -704,7 +707,7 @@ for iteration=1:length(subjects)*length(rois)
                 end
                 
                 % Write output summary file
-                file = fopen([sprintf([output_path '/'...
+                file = fopen([sprintf([outputPath '/'...
                     'sub-%s_roiid-%s_statistics-table.csv'], subject, regionName)], 'w');
                 
                 for a=1:size(statsTable,1)
@@ -744,15 +747,15 @@ for iteration=1:length(subjects)*length(rois)
                     
                     for header=1:length(rois)
                         finalTable{1,tempcount}=strcat(...
-                            rois{1,header}(1:end-4),'_',conds{1,1},'_Similarity');
+                            rois{1,header}(1:end-4),'_',conds{1},'_Similarity');
                         finalTable{1,tempcount+1}=strcat(...
-                            rois{1,header}(1:end-4),'_',conds{1,2},'_Similarity');
+                            rois{1,header}(1:end-4),'_',conds{2},'_Similarity');
                         tempcount=tempcount+2;
                     end
             end
             
-            finalTable{1,tempcount}=['num' conds{1,1}];
-            finalTable{1,tempcount+1}=['num' conds{1,2}];
+            finalTable{1,tempcount}=['num' conds{1}];
+            finalTable{1,tempcount+1}=['num' conds{2}];
             
             row=2;
             header=3;
