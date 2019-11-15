@@ -175,15 +175,21 @@ for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
         end
     end
     
-    clear SpecModelMats NumOfRuns curFuncDir curMotDir matlabbatch;
-    Model = rmfield(Model,'runs');
-    Model = rmfield(Model,'directory');
+    % Gzip all functionals
+    subjFuncDir = fullfile(Func.dir, Subjects{curSub},'func');
+    setenv('subjFuncDir',subjFuncDir);
+    !gzip $subjFuncDir/*/*.nii
     
+    % Create new SPM mat file for gzip nifti files
     load([studyPath filesep Subjects{curSub} filesep 'SPM.mat']);
     for i=1:length(SPM.Vbeta)
         SPM.Vbeta(i).fname = strrep(SPM.Vbeta(i).fname,'nii','nii.gz');
     end
-    save([studyPath filesep Subjects{curSub} filesep 'SPM2.mat']);
+    save([studyPath filesep Subjects{curSub} filesep 'SPM_gz.mat'],'SPM');
+    
+    clear SpecModelMats NumOfRuns curFuncDir curMotDir matlabbatch SPM;
+    Model = rmfield(Model,'runs');
+    Model = rmfield(Model,'directory');
     
     
 end
