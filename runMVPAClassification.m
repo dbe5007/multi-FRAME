@@ -78,7 +78,7 @@ end
 for iteration=1:length(subjects)*length(rois)
     
     % Loop count for all subject/region combinations
-    if iteration==-1
+    if iteration==1
         subjCount=1;
         regionCount=1;
     elseif mod(iteration,length(rois))==mod(1,length(rois))
@@ -101,7 +101,7 @@ for iteration=1:length(subjects)*length(rois)
     dataPath   = fullfile(studyPath, subject);
     outputPath = fullfile(analysis, subject);
     %spmFile = [dataPath '/SPM.mat'];
-    spmFile = [data_path '/SPM_gz.mat'];
+    spmFile = [dataPath '/SPM_gz.mat'];
     
     % create the output path if it doesn't already exist
     if ~exist(outputPath, 'dir')
@@ -109,7 +109,7 @@ for iteration=1:length(subjects)*length(rois)
     end
     
     % Path to current region mask
-    curROI = fullfile(roi_path, ROI);
+    curROI = fullfile(roiPath, ROI);
     
     % Current region name
     regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
@@ -610,7 +610,15 @@ for iteration=1:length(subjects)*length(rois)
         if strcmpi(analysisType,'Searchlight')==0
             
             % Create a tidyverse formatted table for final statistical analysis
-            TrialTypeCombo = {strcat(conds{1,1},'_v_',conds{1,2})};
+            for i=1:length(conds)
+                if i==1
+                    TrialTypeCombo = conds{i};
+                else
+                    TrialTypeCombo = strcat(TrialTypeCombo,'_v_',conds{i});
+                end
+            end
+            
+            TrialTypeCombo = {TrialTypeCombo};
             
             % create subjectid and roiid columns
             subjectid   = repmat({subject}, length(TrialTypeCombo), 1);

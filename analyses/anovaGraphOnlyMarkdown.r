@@ -43,6 +43,7 @@ classAccuraciesCov<-classAccuracies %>%                    #Create table named c
 # Plot Table
 classAccuraciesPlot = classAccuraciesCov[,c(1:5,7)]
 colnames(classAccuraciesPlot) <- c("regionID", "avgClassAcc", "t-stat","pVal","N","maxAcc")
+grid.table(classAccuraciesPlot)
 ```
 Statistics Table
 
