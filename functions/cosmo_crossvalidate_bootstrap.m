@@ -180,9 +180,8 @@ function [pred, accuracy, test_chunks] = cosmo_crossvalidate(ds, classifier, par
         
         % Permute train targets
         % CANLAB update - 7/12/19
-        train_idxs = sort(train_idxs);
-        train_data = ds.samples(train_idxs,:);
-        train_targets = targets(train_idxs);
+        train_data = ds.samples(sort(train_idxs),:);
+        train_targets = targets(sort(train_idxs));
         
         tempNames=structNames;
         tempNames(k)=[];

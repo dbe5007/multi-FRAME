@@ -37,18 +37,154 @@
 %   folder
 
 
+%% Set Project-Specific Variables
+
+try
+    curProjects = {'FaceScene','ICEE','MORF','MAPP','FAME8','NEWPROJECTTEMPLATE'};
+    %retiredProjects = {};
+    
+    index = listdlg('PromptString','Select Project:',...
+        'SelectionMode','single',...
+        'ListString',curProjects);
+    
+    switch curProjects{index}
+        case 'FaceScene'
+            if exist('commandFlag','var')==0
+                analysisName = questdlg('Encoding or Retrieval','Task',...
+                    'Encoding','Retrieval','Cancel','Encoding');
+            else
+                analysisName = 'Encoding';
+            end
+            
+            tasks={'Encoding','Retrieval'};
+            conds={'Target','Lure','Trained','Novel'};
+            numRows = 195;
+            serverPath = '/gpfs/group/nad12/default/nad12/facescene';
+            
+            switch analysisName
+                case 'Encoding'
+                    funcDir = 'Func_enc';
+                    Analysis.behav.regexp = '/*ENCdm.wxls';
+                    Number.OfRows = 195;
+                    suffix = 'encoding';
+                    runs = 5;
+                case 'Retrieval'
+                    funcDir = 'Func_ret_new';
+                    Analysis.behav.regexp = '/*ret.xls';
+                    Number.OfRows = 220;
+                    suffix = 'ret';
+                    runs = 5;
+            end
+            
+            % Set Trial Duration in seconds
+            regressRT.trialSec = 4;
+            
+            % Parameters for model estimation
+            Analysis.name            = ['SingleTrialModel' analysisName];
+            Analysis.behav.directory = [serverPath filesep 'Behav'];
+            
+            Func.dir         = [serverPath filesep funcDir];
+            Func.wildcard    = '^warun.*\.nii'; % File
+            Mot.dir          = [serverPath filesep funcDir];
+            Func.motwildcard = '^rp_.*\.txt';
+            
+            % Please specify:
+            % -The units used (i.e., 'scans' or 'secs')
+            % -The TR or repition time
+            Model.units = 'secs';
+            Model.TR    = 2.5;
+            
+            % Please specify if a mask is used during model estimation
+            Mask.on   = 0; %Default - no mask used
+            Mask.dir  = '/path/to/mask/directory';
+            Mask.name = 'name_of_mask.nii';
+            
+            % Get list of subject directories
+            folders = dir([serverPath filesep funcDir]);
+            for i=1:length(folders)
+                subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
+            end
+            
+            folders = folders(subFlag);
+            for i=1:length(folders)
+                Subjects{i,1}=erase(folders(i).name,'_spm12');
+            end
+            
+        case 'ICEE'
+            if exist('commandFlag','var')==0
+                analysisName = questdlg('Encoding or Retrieval','Task',...
+                    'Encoding','Retrieval','Cancel','Encoding');
+            else
+                analysisName = 'Encoding';
+            end
+            
+            tasks={'Encoding','Retrieval'};
+            conds={'cong', 'inc'};
+            numRows = 195;
+            serverPath = '/gpfs/group/nad12/default/nad12/ICEE';
+            
+            switch analysisName
+                case 'Encoding'
+                    funcDir = 'Func_enc';
+                    Analysis.behav.regexp = '/*ENCdm.xls';
+                    Number.OfRows = 195;
+                    suffix = 'encoding';
+                    runs = 5;
+                case 'Retrieval'
+                    funcDir = 'Func_ret_new';
+                    Analysis.behav.regexp = '/*ret.xls';
+                    Number.OfRows = 220;
+                    suffix = 'ret';
+                    runs = 5;
+            end
+            
+            % Set Trial Duration in seconds
+            regressRT.trialSec = 4;
+            
+            % Parameters for model estimation
+            Analysis.name            = ['SingleTrialModel' analysisName];
+            Analysis.behav.directory = [serverPath filesep 'Behav'];
+            
+            Func.dir         = [serverPath filesep funcDir];
+            Func.wildcard    = '^warun.*\.nii'; % File
+            Mot.dir          = [serverPath filesep funcDir];
+            Func.motwildcard = '^rp_.*\.txt';
+            
+            % Please specify:
+            % -The units used (i.e., 'scans' or 'secs')
+            % -The TR or repition time
+            Model.units = 'secs';
+            Model.TR    = 2.5;
+            
+            % Please specify if a mask is used during model estimation
+            Mask.on   = 0; %Default - no mask used
+            Mask.dir  = '/path/to/mask/directory';
+            Mask.name = 'name_of_mask.nii';
+            
+            % Get list of subject directories
+            folders = dir([serverPath filesep funcDir]);
+            for i=1:length(folders)
+                subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
+            end
+            
+            folders = folders(subFlag);
+            for i=1:length(folders)
+                Subjects{i,1}=erase(folders(i).name,'_spm12');
+            end
+            
+        case 'MAPP'
+            
+            
+    end
+catch
+    warning('Unable to set project information!.')
+end
+
+
 %% Project Paths
 
 % General path setup
-if exist('commandFlag','var')==0
-    analysisName = questdlg('TaskA or TaskB','Task',...
-        'TaskA','TaskB','Cancel','TaskA');
-else
-    analysisName = 'TaskA';
-end
-
-serverPath  = '/path/to/main/project/folder';
-projectPath = [serverPath filesep 'RSA' filesep];
+projectPath = [serverPath filesep 'RSA'];
 studyPath   = [projectPath filesep 'models/unsmoothed/SingleTrialModel' analysisName];
 setenv('project_path',projectPath);
 !mkdir -p $project_path
@@ -59,13 +195,6 @@ if exist('commandFlag','var')==0
         'Yes','No','Cancel','Yes');
 else
     stepFlag = 'Yes';
-end
-
-switch analysisName
-    case 'TaskA'
-        funcDir = 'FolderWithFunctionalDataForTaskA';
-    case 'TaskB'
-        funcDir = 'FolderWithFunctionalDataForTaskB';
 end
 
 switch stepFlag
@@ -95,11 +224,8 @@ switch stepFlag
                 'Confirm Regression',...
                 'Yes','No','Cancel','No');
             
-            % Set Trial Duration in seconds
-            regressRT.trialSec = 4;
         else
             regressRT.flag = 'No';
-            regressRT.trialSec = 4;
         end
         
         switch analysisType
@@ -118,68 +244,17 @@ try
     switch stepFlag
         case 'No'
             
-            switch analysisName
-                case 'TaskA'
-                    Analysis.behav.regexp = '/*TaskABehaviorFileName.xls';
-                    Number.OfRows = 100;
-                    suffix = 'taska';
-                    runs = 5;
-                case 'TaskB'
-                    Analysis.behav.regexp = '/*TaskBBehaviorFileName.xls';
-                    Number.OfRows = 110;
-                    suffix = 'taskb';
-                    runs = 5;
-            end
-            
             for i=1:runs
                 Runs{i} = ['run' num2str(i)];
             end
             
-            serverPath   = '/path/to/server';
-            projectName  = 'projectName';
-            
             % Parameters for model estimation
-            Analysis.name            = ['SingleTrialModel' analysisName];
-            Analysis.directory       = studyPath;
-            Analysis.behav.directory = [serverPath filesep projectName '/NameOfBehavioralFolder'];
+            Analysis.directory = studyPath;
             
-            Func.dir         = [serverPath filesep projectName filesep funcDir];
-            Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [serverPath filesep projectName filesep funcDir];
-            Func.motwildcard = '^rp_.*\.txt';
-            
-            % Each study is different, with a unique TR and a unique onset and
-            % duration unit. Please specify:
-            % -The units used (i.e., 'scans' or 'secs')
-            % -The TR or repition time
-            Model.units = 'secs';
-            Model.TR    = 2.5;
-            
-            % Please specify the name of the current analysis, the directory the
-            % current analysis is in, and the directoy which houses the behavioral
-            % data.
-
-            Mask.on   = 0;
-            Mask.dir  = 'path\to\mask\directory';
-            Mask.name = 'name_of_mask.nii';
-            
-            folders = dir([serverPath filesep projectName filesep funcDir]);
-            
-            for i=1:length(folders)
-                subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
-            end
-            
-            folders = folders(subFlag);
-            
-            for i=1:length(folders)
-                Subjects{i,1}=erase(folders(i).name,'_spm12');
-            end
-            
-            filename=strcat(projectPath,'specify_',analysisName,'_model_params.mat');
-            
-            save(filename,'analysisName','project_path','study_path',...
-                'server_path','project_name','Analysis','funcDir',...
-                'Subjects','Func','Mot','suffix','Runs','Model','Mask');
+            filename=strcat(projectPath,'specify_',analysisName,'_model_params2.mat');
+            save(filename,'analysisName','projectPath','studyPath',...
+                'serverPath','Analysis','funcDir','Subjects','Func',...
+                'Mot','suffix','Runs','Model','Mask');
             
             if ~exist('commandFlag','var')
                 msgbox(['Params for Specify Model script have been created. Please '...
@@ -207,8 +282,8 @@ try
             'Yes','No','Cancel','No');
         
         if strcmpi(bootstrap.flag,'Yes')==1
-            bootstrap.numRuns     = 5;
-            bootstrap.numRows     = 195;
+            bootstrap.numRuns     = runs;
+            bootstrap.numRows     = numRows;
             bootstrap.numTrials   = bootstrap.numRows/...
                 bootstrap.numRuns;
             bootstrap.perm        = inputdlg('How many permutations?',...
@@ -284,11 +359,6 @@ try
                 
                 switch classificationType
                     case 'ERS'
-                        %tasks={'Encoding1','Encoding2',...
-                        %    'Retrieval1','Retrieval2'};
-                        
-                        tasks={'Encoding','Retrieval'};
-                        
                         [index,tf] = listdlg('Name','Possible Tasks',...
                             'PromptString','Ctrl+Click to select conditions:',...
                             'ListString',tasks,...
@@ -346,8 +416,6 @@ try
             case 'Yes'
                 load([projectPath 'vars/conds.mat']);
             case 'No'
-                conds={'ConditionA','ConditionB','ConditionC','ConditionD'};
-                
                 [index,tf] = listdlg('Name','Possible Conditions',...
                     'PromptString','Ctrl+Click to select conditions:',...
                     'ListString',conds,...
@@ -556,18 +624,18 @@ switch classType
     case 'MVPA'
         switch analysisType
             case 'Searchlight'
-                save(filename,'analysisName','project_path','study_path',...
+                save(filename,'analysisName','projectPath','studyPath',...
                     'roi_path','subjects','conds','rois','analysisType',...
                     'analysisName','classType','trialAnalysis','leaveRuns',...
                     'bootstrap','metric','searchlightSize','regressRT');
             otherwise
                 if exist('subConds','var')
-                    save(filename,'analysisName','project_path','study_path',...
+                    save(filename,'analysisName','projectPath','studyPath',...
                         'roi_path','subjects','conds','subConds','rois',...
                         'analysisType','analysisName','classType',...
                         'bootstrap','trialAnalysis','leaveRuns','regressRT');
                 else
-                    save(filename,'analysisName','project_path','study_path',...
+                    save(filename,'analysisName','projectPath','studyPath',...
                         'roi_path','subjects','conds','rois','analysisType',...
                         'analysisName','classType','trialAnalysis',...
                         'bootstrap','leaveRuns','regressRT');
@@ -575,12 +643,12 @@ switch classType
         end
     case 'RSA'
         if exist('subConds','var')
-            save(filename,'analysisName','project_path','study_path',...
+            save(filename,'analysisName','projectPath','studyPath',...
                 'roi_path','subjects','conds','subConds','rois',...
                 'analysisType','analysisName','classType','bootstrap',...
                 'trialAnalysis','classificationType','regressRT');
         else
-            save(filename,'analysisName','project_path','study_path',...
+            save(filename,'analysisName','projectPath','studyPath',...
                 'roi_path','subjects','conds','rois','analysisType',...
                 'analysisName','classType','trialAnalysis','bootstrap',...
                 'classificationType','tasks','regressRT');
