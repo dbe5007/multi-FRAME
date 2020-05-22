@@ -1,6 +1,10 @@
 ---
-title: "Graph of Classification Accuracy"
+title:  "Graph of Classification Accuracy"
 output: html_document
+author: 
+- "Courtney Gerver - Original Author"
+- "Daniel Elbich - Editor"
+date:   "`r format(Sys.time(), '%d %B %Y')`"
 ---
 
 ```{r setup, include=FALSE}
@@ -19,6 +23,7 @@ library(ggplot2)
 library(broom)
 library(grid)
 library(gridExtra)
+library(kableExtra)
 
 # Get list of region CSV files
 filelist = list.files(path = dataPath[1], recursive = TRUE, pattern = "table.csv", full.names = TRUE)
