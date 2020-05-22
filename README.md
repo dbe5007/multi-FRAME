@@ -36,7 +36,7 @@ Below is order of scripts to be run in the pipeline assuming a new data project:
 
 
 ## Publications
-Dennis, N. A., & Overman, A. A., Gerver, C. R., McGraw, K., Rowley, M. A., & Salerno, J. M. (2019). Different types of associative encoding evoke differential processing in both younger and older adults: evidence from univariate and multivariate analyses. Neuropsychologia, 135. https://doi.org/10.1016/j.neuropsychologia.2019.107240
+Dennis, N. A., & Overman, A. A., Gerver, C. R., McGraw, K., Rowley, M. A., & Salerno, J. M. (2019). *Different types of associative encoding evoke differential processing in both younger and older adults: evidence from univariate and multivariate analyses.* Neuropsychologia, 135. https://doi.org/10.1016/j.neuropsychologia.2019.107240
 
-Gerver, C. R., Overman, A. A., Babu, H. J., Hultman, C. E., & Dennis, N. A. (in press). Examining the neural basis of congruent and incongruent configural contexts during associative retrieval. Journal of Cognitive Neuroscience.
+Gerver, C. R., Overman, A. A., Babu, H. J., Hultman, C. E., & Dennis, N. A. (in press). *Examining the neural basis of congruent and incongruent configural contexts during associative retrieval.* Journal of Cognitive Neuroscience.
 
