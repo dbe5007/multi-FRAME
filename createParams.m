@@ -1,9 +1,13 @@
-%% Create params
+%% Create Parameters
 %   Editor:    Daniel Elbich
 %   Created:   3/14/19
 %
 %   Creates parameters .mat file for use with MVPA scripts
 %
+%
+%   Updated:   5/22/19
+%
+%   Reorganized script to handle variable preprocessing.
 %
 %   Updated:   9/19/19
 %
@@ -37,181 +41,106 @@
 %   folder
 
 
-%% Set Project-Specific Variables
+%% Set Pipeline Parameters
+
+%  Set Path Variables
+projectPath = '/path/to/project/parent/folder';
+funcDir = inputdlg(['Enter Path to Functional Data Starting from: ' projectPath],...
+    'File Path',[1 35],{'e.g. CPM/subj/behav'});
+funcDir = [projectPath filesep funcDir];
+
+%trialTag.Dir = [serverPath filesep '/path/to/trialtags.xlsx'];
+trialTag.Dir = inputdlg(['Enter Path to Behavioral File Starting from: ' projectPath],...
+    'File Path',[1 35],{'e.g. CPM/subj/behav'})
+
+trialTag.ext = inputdlg('Enter Trial Tag File Extension:',...
+    'File extension',[1 35],{'e.g. xlsx, csv'});
+
+%  Functional Data Preprocessing Program
+if exist('commandFlag','var')==0
+    preprocPipeline = questdlg('Select Preprocessing Pipeline',...
+        'Confirm Pipeline',...
+        'SPM12','fMRIPrep','Cancel','fMRIPrep');
+else
+    preprocPipeline = 'fMRIPrep';
+end
+
+%  Obtain Data Parameter Information
 
 try
-    curProjects = {'FaceScene','ICEE','MORF','MAPP','FAME8','NEWPROJECTTEMPLATE'};
-    %retiredProjects = {};
-    
-    index = listdlg('PromptString','Select Project:',...
-        'SelectionMode','single',...
-        'ListString',curProjects);
-    
-    switch curProjects{index}
-        case 'FaceScene'
-            if exist('commandFlag','var')==0
-                analysisName = questdlg('Encoding or Retrieval','Task',...
-                    'Encoding','Retrieval','Cancel','Encoding');
-            else
-                analysisName = 'Encoding';
-            end
-            
-            tasks={'Encoding','Retrieval'};
-            conds={'Target','Lure','Trained','Novel'};
-            numRows = 195;
-            serverPath = '/gpfs/group/nad12/default/nad12/facescene';
-            
-            switch analysisName
-                case 'Encoding'
-                    funcDir = 'Func_enc';
-                    Analysis.behav.regexp = '/*ENCdm.wxls';
-                    Number.OfRows = 195;
-                    suffix = 'encoding';
-                    runs = 5;
-                case 'Retrieval'
-                    funcDir = 'Func_ret_new';
-                    Analysis.behav.regexp = '/*ret.xls';
-                    Number.OfRows = 220;
-                    suffix = 'ret';
-                    runs = 5;
-            end
-            
-            % Set Trial Duration in seconds
-            regressRT.trialSec = 4;
-            
-            % Parameters for model estimation
-            Analysis.name            = ['SingleTrialModel' analysisName];
-            Analysis.behav.directory = [serverPath filesep 'Behav'];
-            
-            Func.dir         = [serverPath filesep funcDir];
-            Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [serverPath filesep funcDir];
-            Func.motwildcard = '^rp_.*\.txt';
-            
-            % Please specify:
-            % -The units used (i.e., 'scans' or 'secs')
-            % -The TR or repition time
-            Model.units = 'secs';
-            Model.TR    = 2.5;
-            
-            % Please specify if a mask is used during model estimation
-            Mask.on   = 0; %Default - no mask used
-            Mask.dir  = '/path/to/mask/directory';
-            Mask.name = 'name_of_mask.nii';
-            
-            % Get list of subject directories
-            folders = dir([serverPath filesep funcDir]);
-            for i=1:length(folders)
-                subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
-            end
-            
-            folders = folders(subFlag);
-            for i=1:length(folders)
-                Subjects{i,1}=erase(folders(i).name,'_spm12');
-            end
-            
-        case 'ICEE'
-            if exist('commandFlag','var')==0
-                analysisName = questdlg('Encoding or Retrieval','Task',...
-                    'Encoding','Retrieval','Cancel','Encoding');
-            else
-                analysisName = 'Encoding';
-            end
-            
-            tasks={'Encoding','Retrieval'};
-            conds={'cong', 'inc'};
-            numRows = 195;
-            serverPath = '/gpfs/group/nad12/default/nad12/ICEE';
-            
-            switch analysisName
-                case 'Encoding'
-                    funcDir = 'Func_enc';
-                    Analysis.behav.regexp = '/*ENCdm.xls';
-                    Number.OfRows = 195;
-                    suffix = 'encoding';
-                    runs = 5;
-                case 'Retrieval'
-                    funcDir = 'Func_ret_new';
-                    Analysis.behav.regexp = '/*ret.xls';
-                    Number.OfRows = 220;
-                    suffix = 'ret';
-                    runs = 5;
-            end
-            
-            % Set Trial Duration in seconds
-            regressRT.trialSec = 4;
-            
-            % Parameters for model estimation
-            Analysis.name            = ['SingleTrialModel' analysisName];
-            Analysis.behav.directory = [serverPath filesep 'Behav'];
-            
-            Func.dir         = [serverPath filesep funcDir];
-            Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [serverPath filesep funcDir];
-            Func.motwildcard = '^rp_.*\.txt';
-            
-            % Please specify:
-            % -The units used (i.e., 'scans' or 'secs')
-            % -The TR or repition time
-            Model.units = 'secs';
-            Model.TR    = 2.5;
-            
-            % Please specify if a mask is used during model estimation
-            Mask.on   = 0; %Default - no mask used
-            Mask.dir  = '/path/to/mask/directory';
-            Mask.name = 'name_of_mask.nii';
-            
-            % Get list of subject directories
-            folders = dir([serverPath filesep funcDir]);
-            for i=1:length(folders)
-                subFlag(i) = ~isempty(strfind(folders(i).name,'_spm12'));
-            end
-            
-            folders = folders(subFlag);
-            for i=1:length(folders)
-                Subjects{i,1}=erase(folders(i).name,'_spm12');
-            end
-            
-        case 'MAPP'
-            
-            
-    end
+numDat.Datapoints = inputdlg('How many volumes [Length of task]?',...
+    'Volume Number',[1 35],{'150'});
+numDat.Datapoints = str2double(num.Datapoints{:});
+
+numDat.Runs = inputdlg('How many runs [# of functional runs]?',...
+   'Number of Runs',[1 35],{'1'});
+numDat.Runs = str2double(num.Runs{:});
+
+analysisName = inputdlg('Enter Task Name: [as written in functional filename]',...
+  'Task Name',[1 35],{'e.g. encoding, nback, rest'});
+
+conditions = inputdlg('Enter Conditions of Interest: [separated by commas]',...
+'Conditions',[1 35],{'e.g. face, object, place'});
+
+%% Set Project-Specific Variables
+
+Analysis.name            = ['SingleTrialModel' analysisName];
+Analysis.behav.directory = [serverPath filesep trialTag.Dir];
+
+% Please specify:
+% -The units used (i.e., 'scans' or 'secs')
+% -The TR or repition time
+Model.units = 'secs';
+Model.TR    = 2.5;
+Model.TR  = inputdlg('Enter TR: [in seconds]',...
+   'Repetition Time',[1 35],{'2'});
+Model.TR  = str2double(Model.TR {:});
+
+% Please specify if a mask is used during model estimation
+Mask.on   = 0; %Default - no mask used
+Mask.dir  = '/path/to/mask/directory';
+Mask.name = 'name_of_mask.nii';
+
+switch preprocPipeline
+case 'SPM12'
+
+Func.dir         = [serverPath filesep funcDir];
+Func.wildcard    = '^warun.*\.nii'; % File
+Mot.dir          = [serverPath filesep funcDir];
+Func.motwildcard = '^rp_.*\.txt';
+
+case 'fMRIPrep'
+Func.dir         = [serverPath filesep funcDir];
+Func.wildcard    = '*\analysisName.*\.nii.gz'; % File
+Mot.dir          = [serverPath filesep funcDir];
+Func.motwildcard = ['*\analysisName.*\.' trialTag.ext];
+
+end
+
 catch
     warning('Unable to set project information!.')
 end
 
-
 %% Project Paths
 
 % General path setup
-projectPath = [serverPath filesep 'RSA'];
-studyPath   = [projectPath filesep 'models/unsmoothed/SingleTrialModel' analysisName];
-setenv('project_path',projectPath);
-!mkdir -p $project_path
+analysisPath = [serverPath filesep 'multivariate'];
+studyPath   = [analysisPath filesep 'models/' Analysis.name];
+setenv('studyPath',studyPath);
+!mkdir -p $studyPath
 
-% Select analysis type. No searchlight is default
-if exist('commandFlag','var')==0
-    stepFlag = questdlg('Has Specify/Estimate Model been run?','Confirm Step',...
-        'Yes','No','Cancel','Yes');
-else
-    stepFlag = 'Yes';
-end
-
-switch stepFlag
-    case 'Yes'
-        
         % Select pattern classification analysis. No searchlight is default
         if exist('commandFlag','var')==0
-            classType = questdlg('Select Classification Type',...
+            classType = questdlg('Select Multivariate Analysis',...
                 'Confirm Classification',...
-                'MVPA','RSA','Cancel','MVPA');
+                'MVPA','RSA','ERS','Cancel','MVPA');
         else
             classType = 'MVPA';
         end
         
         % Select analysis type. No searchlight is default
         if exist('commandFlag','var')==0
-            analysisType = questdlg('Select Analysis Type',...
+            analysisType = questdlg('Select Analysis Level for Multivariate Test:',...
                 'Confirm Searchlight',...
                 'Searchlight','ROI','Cancel','ROI');
         else
@@ -230,46 +159,12 @@ switch stepFlag
         
         switch analysisType
             case 'Searchlight'
-                roi_path    = [projectPath 'ROIs/searchlight'];
+                roiPath     = [projectPath 'ROIs/searchlight'];
                 searchlight = 'Yes';
             otherwise
-                roi_path    = '/path/to/common/mask/folder';
+                roiPath     = '/path/to/common/mask/folder';
                 searchlight = 'No';
         end
-end
-
-%% Params for Specify/Estimate Model
-
-try
-    switch stepFlag
-        case 'No'
-            
-            for i=1:runs
-                Runs{i} = ['run' num2str(i)];
-            end
-            
-            % Parameters for model estimation
-            Analysis.directory = studyPath;
-            
-            filename=strcat(projectPath,'specify_',analysisName,'_model_params2.mat');
-            save(filename,'analysisName','projectPath','studyPath',...
-                'serverPath','Analysis','funcDir','Subjects','Func',...
-                'Mot','suffix','Runs','Model','Mask');
-            
-            if ~exist('commandFlag','var')
-                msgbox(['Params for Specify Model script have been created. Please '...
-                    'run Specify Model and then re-run this script.']);
-            end
-            
-            clear;
-            return;
-        case 'Yes'
-            %delete([project_path,'specify_',analysisName,'_model_params.mat']);
-    end
-catch
-    warning(['Unable to create parameter file for Specify Model.'...
-        'Set to debug mode.']);
-end
 
 %% Classification Flags
 
@@ -305,21 +200,21 @@ try
             % Compute MVPA with entire run to train/test or individual
             % trials to train/test
             try
-                if exist('commandFlag','var')==0
-                    trialAnalysis = questdlg('Test/Train on Runs or Trials',...
-                        'Confirm Trial/Run',...
-                        'Run','Trial','Cancel','Run');
-                else
+                %if exist('commandFlag','var')==0
+                    %trialAnalysis = questdlg('Test/Train on Runs or Trials',...
+                        %'Confirm Trial/Run',...
+                        %'Run','Trial','Cancel','Run');
+                %else
                     trialAnalysis = 'Run';
-                end
+                %end
                 
-                if strcmpi(trialAnalysis,'Trial')==1
-                    leaveRuns = questdlg('Number of Trials to Test',...
-                        'Confirm Trial Tests',...
-                        'One','Two','Cancel','Run');
-                else
+                %if strcmpi(trialAnalysis,'Trial')==1
+                    %leaveRuns = questdlg('Number of Trials to Test',...
+                        %'Confirm Trial Tests',...
+                        %'One','Two','Cancel','Run');
+                %else
                     leaveRuns = NaN;
-                end
+                %end
                 
                 if strcmpi(analysisType, 'Searchlight')==1
                     metric = questdlg('Searchlight Metric',...
@@ -340,24 +235,14 @@ try
             % Compute RSA with mean activation pattern (average all trials)
             % or individual trial pattern (all trials are separate)
             try
-                if exist('commandFlag','var')==0
-                    trialAnalysis = questdlg('Individual or Mean Conditions',...
-                        'Confirm Trial/Run',...
-                        'Individual','Mean','Cancel','Individual');
-                else
+                %if exist('commandFlag','var')==0
+                    %trialAnalysis = questdlg('Individual or Mean Conditions',...
+                        %'Confirm Trial/Run',...
+                        %'Individual','Mean','Cancel','Individual');
+                %else
                     trialAnalysis = 'Individual';
-                end
+                %end
                 
-                % Perform RSA or ERS. Default is RSA.
-                if exist('commandFlag','var')==0
-                    classificationType = questdlg...
-                        ('Single Task RSA or ERS?','Confirm Similarity',...
-                        'RSA','ERS','Cancel','RSA');
-                else
-                    classificationType = 'RSA';
-                end
-                
-                switch classificationType
                     case 'ERS'
                         [index,tf] = listdlg('Name','Possible Tasks',...
                             'PromptString','Ctrl+Click to select conditions:',...
@@ -366,7 +251,6 @@ try
                         tasks=tasks(index);
                         
                         save([projectPath 'vars/tasks.mat'],'tasks');
-                end
                 
             catch
                 warning(['Error in setting RSA/ERS analysis flags. '...
@@ -381,7 +265,7 @@ end
 
 try
     % List subject directory
-    subjDir=dir(studyPath);
+    subjDir=dir(funcDir);
     
     % Remove non-subject directories & possible files in directory
     for i=1:length(subjDir)
@@ -394,8 +278,8 @@ try
         subjects{i,1}=subjDir(i).name;
     end
     
-    !mkdir -p $project_path/vars
-    save([projectPath 'vars/subjects.mat'],'subjects');
+    !mkdir -p $analysisPath/vars
+    save([analysisPath 'vars/subjects.mat'],'subjects');
     
     clear subjCount i subjDir;
 catch
@@ -406,39 +290,25 @@ end
 
 try
     if exist('commandFlag','var')==0
-        conditionFlag=questdlg('Conditions specified?','Confirm Conditions',...
-            'Yes','No','Cancel','Yes');
+
+        conds = [cellstr(conditions)];
         
         subconditionFlag=questdlg('Are there subconditions? (If unsure select No)',...
             'Confirm Subconditions','Yes','No','Cancel','No');
         
-        switch conditionFlag
-            case 'Yes'
-                load([projectPath 'vars/conds.mat']);
-            case 'No'
-                [index,tf] = listdlg('Name','Possible Conditions',...
-                    'PromptString','Ctrl+Click to select conditions:',...
-                    'ListString',conds,...
-                    'ListSize',[280,300]);
-                conds=conds(index);
-                
-                save([projectPath 'vars/conds.mat'],'conds');
-        end
-        
-        switch subconditionFlag
-            case 'Yes'
-                load([projectPath 'vars/subConds.mat']);
-        end
-        
-    else
-        load([projectPath 'vars/conds.mat']);
-        if exist([projectPath 'vars/subConds.mat'],'file')
-            load([projectPath 'vars/subConds.mat']);
-        end
-    end
+        save([analysisPath 'vars/conds.mat'],'conds');
+        [index,tf] = listdlg('Name','Possible Conditions',...
+            'PromptString','Ctrl+Click to select conditions:',...
+            'ListString',conds,...
+            'ListSize',[280,300]);
+
+        subconds=subconds(index);
+        save([analysisPath 'vars/subconds.mat'],'subconds');
+
 catch
     warning('Unable to assign conditions. Set to debug mode.');
 end
+
 
 %% Create ROI List
 
@@ -572,89 +442,130 @@ end
 
 try
     % Set filename for parameter .mat file
-    switch classType
-        case 'MVPA'
-            switch analysisType
-                case 'Searchlight'
-                    filename=strcat(projectPath,'params_',...
-                            analysisName,'_',classType,'_',...
-                            analysisType,'_',trialAnalysis,'_',...
-                            metric,'_',num2str(searchlightSize),'_',...
-                            conds{1,1},'_',conds{1,2},'_Bootstrap_',...
-                            bootstrap.flag,'.mat');
-                otherwise
-                    if exist('subConds','var')
-                        filename=strcat(projectPath,'params_',...
-                            analysisName,'_',classType,'_',...
-                            analysisType,'_',trialAnalysis,'_',...
-                            conds{1,1},'_',conds{1,2},'_',...
-                            subConds{1,1},'_',subConds{1,2},'_Bootstrap_',...
-                            bootstrap.flag,'.mat');
-                    else
-                        filename=strcat(projectPath,'params_',...
-                            analysisName,'_',classType,'_',...
-                            analysisType,'_',trialAnalysis,'_',...
-                            conds{1,1},'_',conds{1,2},'_Bootstrap_',...
-                            bootstrap.flag,'.mat');
-                    end
-            end
-        case 'RSA'
-            if exist('subConds','var')
-                filename=strcat(projectPath,'params_',...
-                    analysisName,'_',classificationType,'_',...
-                    analysisType,'_',trialAnalysis,'_',...
-                    conds{1,1},'_',conds{1,2},'_',...
-                    subConds{1,1},'_',subConds{1,2},'_Bootstrap_',...
-                    bootstrap.flag,'.mat');
-            else
-                
-                filename=strcat(projectPath,'params_',...
-                    analysisName,'_',classificationType,'_',...
-                    analysisType,'_',trialAnalysis,'_',...
-                    conds{1,1},'_',conds{1,2},'_Bootstrap_',...
-                    bootstrap.flag,'.mat');
-            end
-    end
+switch analysisType
+case 'Searchlight'
+filename=strcat(analysisPath,'/params_',analysisName,'_',classType,'_',analysisType,'_',metric,'_',num2str(searchlightSize),'_',conds{1,1},'_',conds{1,2},'_Bootstrap_',bootstrap.flag,'.mat');
+otherwise
+filename=strcat(analysisPath,'params_',analysisName,'_',classType,'_',analysisType,'_',conds{1,1},'_',conds{1,2},'_subConds',num2str(exist(subconds,1)),'_Bootstrap_',bootstrap.flag,'.mat');
+end
+
 catch
     warning('Unable to set params filename. Set to debug mode.');
 end
 
 %% Save Params File
-switch classType
-    case 'MVPA'
         switch analysisType
             case 'Searchlight'
-                save(filename,'analysisName','projectPath','studyPath',...
-                    'roi_path','subjects','conds','rois','analysisType',...
-                    'analysisName','classType','trialAnalysis','leaveRuns',...
-                    'bootstrap','metric','searchlightSize','regressRT');
+                save(filename,'projectPath','funcDir','trialTag',...
+                    'preprocPipeline','numDat','analysisName','conditions','Analysis',...
+                    'Model','Mask','Func','Mot','analysisPath',...
+                    'studyPath','metric','classType','analysisType','regressRT','roiPath','searchlight','bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize',);
             otherwise
-                if exist('subConds','var')
-                    save(filename,'analysisName','projectPath','studyPath',...
-                        'roi_path','subjects','conds','subConds','rois',...
-                        'analysisType','analysisName','classType',...
-                        'bootstrap','trialAnalysis','leaveRuns','regressRT');
-                else
-                    save(filename,'analysisName','projectPath','studyPath',...
-                        'roi_path','subjects','conds','rois','analysisType',...
-                        'analysisName','classType','trialAnalysis',...
-                        'bootstrap','leaveRuns','regressRT');
-                end
-        end
-    case 'RSA'
-        if exist('subConds','var')
-            save(filename,'analysisName','projectPath','studyPath',...
-                'roi_path','subjects','conds','subConds','rois',...
-                'analysisType','analysisName','classType','bootstrap',...
-                'trialAnalysis','classificationType','regressRT');
-        else
-            save(filename,'analysisName','projectPath','studyPath',...
+                save(filename,'analysisName','projectPath','studyPath',...
                 'roi_path','subjects','conds','rois','analysisType',...
-                'analysisName','classType','trialAnalysis','bootstrap',...
-                'classificationType','tasks','regressRT');
-        end
+                'analysisName','classType','trialAnalysis','leaveRuns',...
+                'bootstrap','metric','searchlightSize','regressRT');
 end
 
 clear;
 clc;
 disp('All finished!!');
+
+
+%%%%%%% DELETE AFTER HERE %%%%%%%%
+
+
+        case 'RSA'
+            % Compute RSA with mean activation pattern (average all trials)
+            % or individual trial pattern (all trials are separate)
+            try
+                %if exist('commandFlag','var')==0
+                    %trialAnalysis = questdlg('Individual or Mean Conditions',...
+                        %'Confirm Trial/Run',...
+                        %'Individual','Mean','Cancel','Individual');
+                %else
+                    trialAnalysis = 'Individual';
+                %end
+                
+                % Perform RSA or ERS. Default is RSA.
+                if exist('commandFlag','var')==0
+                    classificationType = questdlg...
+                        ('Single Task RSA or ERS?','Confirm Similarity',...
+                        'RSA','ERS','Cancel','RSA');
+                else
+                    classificationType = 'RSA';
+                end
+                
+                switch classificationType
+                    case 'ERS'
+                        [index,tf] = listdlg('Name','Possible Tasks',...
+                            'PromptString','Ctrl+Click to select conditions:',...
+                            'ListString',tasks,...
+                            'ListSize',[280,300]);
+                        tasks=tasks(index);
+                        
+                        save([projectPath 'vars/tasks.mat'],'tasks');
+                end
+                
+            catch
+                warning(['Error in setting RSA/ERS analysis flags. '...
+                    'Set to debug mode.']);
+            end
+    end
+catch
+    warning('Error in setting classification flags. Set to debug mode.');
+end
+
+%% Create Subject List
+
+try
+    % List subject directory
+    subjDir=dir(funcDir);
+    
+    % Remove non-subject directories & possible files in directory
+    for i=1:length(subjDir)
+        subFlag(i) = isempty(strfind(subjDir(i).name,'.'));
+    end
+    subjDir = subjDir(subFlag);
+    
+    % Search 'study_path' directory to get list of subjects
+    for i=1:length(subjDir)
+        subjects{i,1}=subjDir(i).name;
+    end
+    
+    !mkdir -p $analysisPath/vars
+    save([analysisPath 'vars/subjects.mat'],'subjects');
+    
+    clear subjCount i subjDir;
+catch
+    warning('Unable to create subject list. Set to debug mode.');
+end
+
+%% Assign Conditions
+
+try
+    if exist('commandFlag','var')==0
+
+        conds = [cellstr(conditions)];
+        
+        subconditionFlag=questdlg('Are there subconditions? (If unsure select No)',...
+            'Confirm Subconditions','Yes','No','Cancel','No');
+        
+        save([analysisPath 'vars/conds.mat'],'conds');
+        [index,tf] = listdlg('Name','Possible Conditions',...
+            'PromptString','Ctrl+Click to select conditions:',...
+            'ListString',conds,...
+            'ListSize',[280,300]);
+
+        subconds=subconds(index);
+        save([analysisPath 'vars/subconds.mat'],'subconds');
+
+catch
+    warning('Unable to assign conditions. Set to debug mode.');
+end
+
+
+
+
+
+
