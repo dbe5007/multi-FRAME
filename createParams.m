@@ -5,7 +5,7 @@
 %   Creates parameters .mat file for use with MVPA scripts
 %
 %
-%   Updated:   5/22/19
+%   Updated:   5/22/20
 %
 %   Reorganized script to handle variable preprocessing.
 %
@@ -46,7 +46,7 @@
 %  Set Path Variables
 projectPath = '/path/to/project/parent/folder';
 funcDir = inputdlg(['Enter Path to Functional Data Starting from: ' projectPath],...
-    'File Path',[1 35],{'e.g. CPM/subj/behav'});
+    'File Path',[1 35],{'e.g. CPM/subj/func'});
 funcDir = [projectPath filesep funcDir];
 
 %trialTag.Dir = [serverPath filesep '/path/to/trialtags.xlsx'];

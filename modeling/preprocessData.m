@@ -1,7 +1,7 @@
 %% Preprocess Functional Data
 %  Daniel Elbich
 %  Cognitive Aging & Neuroimaging Lab
-%  5/22/19
+%  5/22/20
 
 % This script organizes data for preprocessing. The pipeline can accept
 % both SPM and fMRIPrep input.
@@ -28,27 +28,29 @@
 % preprocessing. This is performed to protect integrity of raw data and
 % prevent overwriting.
 
-%% Preprocessing Decision Point
+% Set Analysis Parameters & Paths
+% Load subject IDs, ROIs, and Condition flags
 
-if exist('commandFlag','var')==0
-    preprocPipe = questdlg('Select Preprocessing Pipeline',...
-        'Confirm Preprocessing Pipeline',...
-        'fMRIPrep','SPM12','Cancel','SPM12');
-else
-    preprocPipe = 'MVPA';
+if exist('flag','var') == 0
+    
+    %Select parameter file is flag does not exist
+    uiopen('*.mat')
+    
 end
+
 
 %% Initial Path & File Setup
 
 % Project directories
 projDir = '/director/to/project';
 
-switch preprocPipe
+switch preprocPipeline
     case 'SPM12'
         
         % Add SPM12 to path
         addpath('/directory/to/spm12');
-        dataDir = [projDir '/rawdata'];
+        %dataDir = [projDir '/rawdata'];
+        dataDir = funcDir;
         processDir = [projDir '/derivatives/spmPreprocessing'];
         setenv('dataDir',dataDir);
         setenv('processDir',processDir);
@@ -68,7 +70,8 @@ switch preprocPipe
         !mkdir -p $processDir/psfiles;
         
     case 'fMRIPrep'
-        dataDir = [projDir '/derivatives/fmriprep'];
+        %dataDir = [projDir '/derivatives/fmriprep'];
+        dataDir = funcDir;
 end
 
 if exist('commandFlag','var')==0
@@ -147,7 +150,7 @@ end
 
 %% Main Code
 
-switch preprocPipe
+switch preprocPipeline
     case 'SPM12'
         % Initialize SPM
         spm('defaults', 'FMRI'); % load SPM default options
@@ -394,8 +397,40 @@ switch preprocPipe
     case 'fMRIPrep'
         
         dataDir = [projDir '/fmriprep'];
-        for csub = subjects
-            
-        end
+            for i=1:length(funcFolders)
+                
+                % Read covariates file
+                tsvFiles = dir([processedData '/' funcFolders(i).name '/func/*'analysisName'*confound*.tsv']);
+                
+                if length(tsvFiles)~=0
+                        % Make output folder
+                    setenv('outputDir',[projectDir filesep 'fsl' filesep funcFolders(i).name]);
+                    !mkdir -p $outputDir
+                end
+                
+                for j=1:length(tsvFiles)
+                    
+                    rawCovariates=tdfread([tsvFiles(j).folder '/' tsvFiles(j).name]);
+                    
+                    T = table(rawCovariates.trans_x,rawCovariates.trans_y,...
+                        rawCovariates.trans_z,rawCovariates.rot_x,...
+                        rawCovariates.rot_y,rawCovariates.rot_z);
+                    
+                    %T(1:remove,:)=[];
+                    
+                    filename = strrep(tsvFiles(j).name,...
+                        'desc-confounds_regressors.tsv','confoundEVs.txt');
+
+                    %writetable(T,[processedData '/' funcFolders(i).name '/func/' ...
+                    %    filename],'Delimiter',' ','WriteVariableNames',false);
+
+                    writetable(T,[projectDir filesep 'fsl' filesep funcFolders(i).name...
+                        filesep filename],'Delimiter',' ','WriteVariableNames',false);
+                    
+                    clear rawCovariates T filename;
+                    
+                end
+                
+            end
 end
 
