@@ -85,11 +85,11 @@ THe package is currently equipped to either preprocess data in SPM12 or take dat
 
 
 ## Work using the Package
-# Publications
+### Publications
 Dennis, N. A., & Overman, A. A., Gerver, C. R., McGraw, K., Rowley, M. A., & Salerno, J. M. (2019). *Different types of associative encoding evoke differential processing in both younger and older adults: evidence from univariate and multivariate analyses.* Neuropsychologia, 135. https://doi.org/10.1016/j.neuropsychologia.2019.107240
 
 Gerver, C. R., Overman, A. A., Babu, H. J., Hultman, C. E., & Dennis, N. A. (in press). *Examining the neural basis of congruent and incongruent configural contexts during associative retrieval.* Journal of Cognitive Neuroscience.
 
-# Presentations
+### Presentations
 Elbich, D., Adams, R.B., Kveraga, K., Dennis, N.A. (May, 2020). *Discriminability of Neural Patterns within the Magnocellular and Parvocellular Visual Pathways.* Poster presented at the Cognitive Neuroscience Society Conference, Boston, Massachusetts.
 
