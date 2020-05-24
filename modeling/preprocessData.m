@@ -12,9 +12,9 @@
 % SPM convention (i.e. degrees and radians for translation and rotation,
 % respectively).
 %
-% If SPM12 is the preferredn processing, the script will batch multiple 
-% subjects through a preprocessing pipeline designed to collect ALL 
-% AVAIABLE FUNCTIONAL RUNS USING WILDCARDS, and PREPROCESS THEM 
+% If SPM12 is the preferredn processing, the script will batch multiple
+% subjects through a preprocessing pipeline designed to collect ALL
+% AVAIABLE FUNCTIONAL RUNS USING WILDCARDS, and PREPROCESS THEM
 % ALLTOGETHER. Function scans are realigned to the first image of each run,
 % respectively.
 %
@@ -41,9 +41,6 @@ end
 
 %% Initial Path & File Setup
 
-% Project directories
-projDir = '/director/to/project';
-
 switch preprocPipeline
     case 'SPM12'
         
@@ -51,7 +48,7 @@ switch preprocPipeline
         addpath('/directory/to/spm12');
         %dataDir = [projDir '/rawdata'];
         dataDir = funcDir;
-        processDir = [projDir '/derivatives/spmPreprocessing'];
+        processDir = [projectDir '/derivatives/spmPreprocessing'];
         setenv('dataDir',dataDir);
         setenv('processDir',processDir);
         
@@ -70,8 +67,7 @@ switch preprocPipeline
         !mkdir -p $processDir/psfiles;
         
     case 'fMRIPrep'
-        %dataDir = [projDir '/derivatives/fmriprep'];
-        dataDir = funcDir;
+        dataDir = [projectDir '/preprocessing/fmriprep'];
 end
 
 if exist('commandFlag','var')==0
@@ -177,15 +173,24 @@ switch preprocPipeline
             
             % Copy & unzip functionals
             !mkdir -p $processDir/$subject/func
-            !cp $dataDir/$subject/func/*nii.gz $processDir/$subject/func
+            
+            copyTaskRun = ['cp $dataDir/$subject/func/*' analysisName ...
+                '*nii.gz $processDir/$subject/func'];
+            system(copyTaskRun);
+            
+            %!cp $dataDir/$subject/func/*nii.gz $processDir/$subject/func
             !gunzip $processDir/$subject/func/sub*
             
             % Create separate directories for each run
-            !mkdir -p $processDir/$subject/func/{run1,run2,run3,run4}
-            !mv $processDir/$subject/func/*run-1* $processDir/$subject/func/run1
-            !mv $processDir/$subject/func/*run-2* $processDir/$subject/func/run2
-            !mv $processDir/$subject/func/*run-3* $processDir/$subject/func/run3
-            !mv $processDir/$subject/func/*run-4* $processDir/$subject/func/run4
+            for i=1:numDat.Runs
+                makeRunDir = ['mkdir -p $processDir/$subject/func/run' num2str(i)];
+                system(makeRunDir);
+                
+                copyRuntoDir = ['mv $processDir/$subject/func/*run-' ...
+                    num2str(i) '* $processDir/$subject/func/run' num2str(i)];
+                
+                system(copyRuntoDir);
+            end
             
             % Create the path to this subjects' functional folder
             subjFunc = fullfile(directories.func, csub{:}, 'func');
@@ -234,10 +239,12 @@ switch preprocPipeline
                         
                         matlabbatch{i}.spm.temporal.st.scans = images.reslice;
                         matlabbatch{i}.spm.temporal.st.nslices  = 58;
-                        matlabbatch{i}.spm.temporal.st.tr       = 2.5;
-                        matlabbatch{i}.spm.temporal.st.ta       = 2.5-(2.5/58);
+                        matlabbatch{i}.spm.temporal.st.tr       = Model.TR;
+                        matlabbatch{i}.spm.temporal.st.ta       = Model.TR-(Model.TR/58);
                         %matlabbatch{i}.spm.temporal.st.so       = [2:2:58 1:2:58];   %Even slices collected 1st, then odds; start foot to head
-                        matlabbatch{i}.spm.temporal.st.so       = [1:2:58 2:2:58];   %Odd slices collected 1st, then odds; start foot to head
+                        matlabbatch{i}.spm.temporal.st.so       = [1:2:42 2:2:42];   %Odd slices collected 1st, then odds; start foot to head
+                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:numDat.Slices 1:2:numDat.Slices];   %Even slices collected 1st, then odds; start foot to head
+                        %matlabbatch{i}.spm.temporal.st.so       = [1:2:numDat.Slices 2:2:numDat.Slices];   %Odd slices collected 1st, then odds; start foot to head
                         matlabbatch{i}.spm.temporal.st.refslice = 2;
                         matlabbatch{i}.spm.temporal.st.prefix   = 'a';
                         
@@ -264,7 +271,8 @@ switch preprocPipeline
                             matlabbatch{i-1}.spm.util.imcalc.output '.nii']};
                         
                         for a=1:length(runs)
-                            images.slicetime{a,1} = [runs{a} '/ar' csub{:} '_task-mp_run-' num2str(a) '_bold.nii'];
+                            images.slicetime{a,1} = [runs{a} '/ar' csub{:} ...
+                                '_task-' analysisName '_run-' num2str(a) '_bold.nii'];
                         end
                         
                         matlabbatch{i}.spm.spatial.coreg.estimate.other = images.slicetime;
@@ -329,7 +337,8 @@ switch preprocPipeline
                         matlabbatch{i}.spm.spatial.normalise.estwrite.subj.resample = images.norm;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
-                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'path/to/spm12/tpm/TPM.nii'};
+                        %matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'path/to/spm12/tpm/TPM.nii'};
+                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'/gpfs/group/nad12/default/nad12/spm12/tpm/TPM.nii'};
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.affreg = 'mni';
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.reg = [0 0.001 0.5 0.05 0.2];
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.fwhm = 0;
@@ -368,11 +377,25 @@ switch preprocPipeline
             % Run preprocessing
             spm_jobman('run', matlabbatch);
             
+            %% Copy Motion Data to multivariate folder
+            % Make output folder
+            setenv('outputDir',[studyPath filesep csub{:}]);
+            !mkdir -p $outputDir
+            
+            for j=1:numDat.Runs
+                copyMotion = ['cp -p $processDir/$subject/func/run' num2str(j)...
+                    '/rp* $outputDir/$subject"_task-' analysisName '_run_'...
+                    num2str(j) '_motionRegressors.txt"'];
+                system(copyMotion);
+            end
+            
+            %% Cleanup SPM Processing
             % Rename the ps file from "spm_CurrentDate.ps" to "SubjectID.ps"
             try
                 temp = date;
                 newDate = [temp(end-3:end) temp(4:6) temp(1:2)];
-                movefile(['spm_' newDate '.ps'],sprintf('%s.ps',csub{:}));
+                movefile([directories.psfiles '/spm_' newDate '.ps'],...
+                    sprintf('%s.ps',[directories.psfiles '/' csub{:}]));
             catch
                 % Catch for if processing ends on different day
                 % (e.g. changes in date from start to end)
@@ -383,7 +406,8 @@ switch preprocPipeline
                 else
                     newDate = [temp(end-3:end) temp(4:6) num2str(newDay)];
                 end
-                movefile(['spm_' newDate '.ps'],sprintf('%s.ps',csub{:}));
+                movefile([directories.psfiles '/spm_' newDate '.ps'],...
+                    sprintf('%s.ps',[directories.psfiles '/' csub{:}]));
                 continue;
             end
             
@@ -396,41 +420,46 @@ switch preprocPipeline
         
     case 'fMRIPrep'
         
-        dataDir = [projDir '/fmriprep'];
-            for i=1:length(funcFolders)
+        for i=1:length(subfolders)
+            
+            % Read covariates file
+            tsvFiles = dir([subfolders(i).folder '/' subfolders(i).name '/func/*' analysisName '*confound*.tsv']);
+            
+            if length(tsvFiles)~=0
+                % Make output folder
+                setenv('outputDir',[studyPath filesep subfolders(i).name]);
+                !mkdir -p $outputDir
+            end
+            
+            for j=1:length(tsvFiles)
                 
-                % Read covariates file
-                tsvFiles = dir([processedData '/' funcFolders(i).name '/func/*'analysisName'*confound*.tsv']);
+                rawCovariates=tdfread([tsvFiles(j).folder '/' tsvFiles(j).name]);
                 
-                if length(tsvFiles)~=0
-                        % Make output folder
-                    setenv('outputDir',[projectDir filesep 'fsl' filesep funcFolders(i).name]);
-                    !mkdir -p $outputDir
+                T = table(rawCovariates.trans_x,rawCovariates.trans_y,...
+                    rawCovariates.trans_z,rawCovariates.rot_x,...
+                    rawCovariates.rot_y,rawCovariates.rot_z);
+                
+                % Convert Rotation millimeters to Radians to fit SMP12
+                for k=4:6
+                    
+                    temp = T{:,k}./50; %Convert to mm by multiplying radians by 50mm radius - see Power framewise displacement paper
+                    T{:,k} = temp;
+                    
+                    clear temp;
                 end
                 
-                for j=1:length(tsvFiles)
-                    
-                    rawCovariates=tdfread([tsvFiles(j).folder '/' tsvFiles(j).name]);
-                    
-                    T = table(rawCovariates.trans_x,rawCovariates.trans_y,...
-                        rawCovariates.trans_z,rawCovariates.rot_x,...
-                        rawCovariates.rot_y,rawCovariates.rot_z);
-                    
-                    %T(1:remove,:)=[];
-                    
-                    filename = strrep(tsvFiles(j).name,...
-                        'desc-confounds_regressors.tsv','confoundEVs.txt');
-
-                    %writetable(T,[processedData '/' funcFolders(i).name '/func/' ...
-                    %    filename],'Delimiter',' ','WriteVariableNames',false);
-
-                    writetable(T,[projectDir filesep 'fsl' filesep funcFolders(i).name...
-                        filesep filename],'Delimiter',' ','WriteVariableNames',false);
-                    
-                    clear rawCovariates T filename;
-                    
-                end
+                filename = strrep(tsvFiles(j).name,...
+                    'desc-confounds_regressors.tsv','motionRegressors.txt');
+                
+                % Write new function for writetable - issue in 2019
+                
+                writetable(T,[studyPath filesep subfolders(i).name filesep...
+                    filename],'Delimiter',' ','WriteVariableNames',false);
+                
+                clear rawCovariates T filename;
                 
             end
+            
+        end
 end
 
