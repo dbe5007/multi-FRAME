@@ -46,20 +46,24 @@
 %  Set Path Variables
 
 % Parent/Project Path - directory containing project data and analyses
-projectDir = inputdlg(['Enter path to parent directory: '],...
+directory.Project = inputdlg(['Enter path to parent directory: '],...
     'File Path',[1 35],{pwd});
-projectDir = projectDir{:};
+directory.Project = directory.Project{:};
 
-funcDir = inputdlg(['Enter Path to Functional Data Starting from: ' projectDir],...
+% Directories for raw functional data and behavioral data
+rawData.funcDir = inputdlg(['Enter Path to raw functional data starting from: ' directory.Project],...
     'File Path',[1 35],{'e.g. CPM/subj/func'});
-funcDir = [projectDir filesep funcDir{:}];
+rawData.funcDir = [directory.Project filesep rawData.funcDir{:}];
 
-%trialTag.Dir = [serverPath filesep '/path/to/trialtags.xlsx'];
-trialTag.Dir = inputdlg(['Enter Path to Behavioral File Starting from: ' projectDir],...
+% Directory of the behavioral data file
+rawData.behavDir = inputdlg(['Enter Path to behavioral file starting from: ' directory.Project],...
     'File Path',[1 35],{'e.g. CPM/subj/behav'});
+rawData.behavDir = rawData.behavDir{:};
 
-trialTag.ext = inputdlg('Enter Trial Tag File Extension:',...
+% Extension of the behavioral file to help search
+rawData.behavFile = inputdlg('Enter Trial Tag File Extension:',...
     'File extension',[1 35],{'e.g. xlsx, csv'});
+rawData.behavFile = rawData.behavFile{:};
 
 %  Functional Data Preprocessing Program
 if exist('commandFlag','var')==0
@@ -70,28 +74,28 @@ else
     preprocPipeline = 'fMRIPrep';
 end
 
-%  Obtain Data Parameter Information
-
 try
-    numDat.Datapoints = inputdlg('How many volumes [Length of task]?',...
-        'Volume Number',[1 35],{'150'});
-    numDat.Datapoints = str2double(numDat.Datapoints{:});
-    
-    numDat.Runs = inputdlg('How many runs [# of functional runs]?',...
-        'Number of Runs',[1 35],{'1'});
-    numDat.Runs = str2double(numDat.Runs{:});
-    
-    analysisName = inputdlg('Enter Task Name: [as written in functional filename]',...
+    %% Task and Data Information
+    taskName = inputdlg('Enter Task Name: [as written in functional filename]',...
         'Task Name',[1 35],{'e.g. encoding, nback, rest'});
-    analysisName = analysisName{:};
+    taskName = taskName{:};
     
     conditions = inputdlg('Enter Conditions of Interest: [separated by commas]',...
         'Conditions',[1 35],{'e.g. face, object, place'});
+    dataInfo.Datapoints = inputdlg('How many volumes [Length of task]?',...
+        'Volume Number',[1 35],{'150'});
+    dataInfo.Datapoints = str2double(dataInfo.Datapoints{:});
+    
+    dataInfo.Runs = inputdlg('How many runs [# of functional runs]?',...
+        'Number of Runs',[1 35],{'1'});
+    dataInfo.Runs = str2double(dataInfo.Runs{:});
+    
+    dataInfo.Trials = inputdlg('How many trials per run [sum trials for all conditions]?',...
+        'Volume Number',[1 35],{'40'});
+    dataInfo.Trials = str2double(dataInfo.Trials{:});
+    
     
     %% Set Project-Specific Variables
-    
-    Analysis.name            = ['SingleTrialModel' analysisName];
-    Analysis.behav.directory = [projectDir filesep trialTag.Dir];
     
     % Please specify:
     % -The units used (i.e., 'scans' or 'secs')
@@ -109,20 +113,19 @@ try
     
     switch preprocPipeline
         case 'SPM12'
-            
-            Func.dir         = [projectDir filesep funcDir];
+            Func.dir         = [directory.Project filesep rawData.funcDir];
             Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [projectDir filesep funcDir];
+            Mot.dir          = [directory.Project filesep rawData.funcDir];
             Func.motwildcard = '^rp_.*\.txt';
-            numDat.Slices = inputdlg('How many slices [# of slices in volume]?',...
+            dataInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
                 'Number of Slices',[1 35],{'50'});
-            numDat.Slices = str2double(numDat.Slices{:});
+            dataInfo.Slices = str2double(dataInfo.Slices{:});
             
         case 'fMRIPrep'
-            Func.dir         = [projectDir filesep funcDir];
-            Func.wildcard    = ['*\' analysisName '.*\.nii.gz']; % File
-            Mot.dir          = [projectDir filesep funcDir];
-            Func.motwildcard = ['*\analysisName.*\.' trialTag.ext];
+            Func.dir         = [directory.Project filesep rawData.funcDir];
+            Func.wildcard    = ['*\' taskName '.*\.nii.gz']; % File
+            Mot.dir          = [directory.Project filesep rawData.funcDir];
+            Func.motwildcard = ['*\taskName.*\.' rawData.behavFile];
             
     end
     
@@ -133,22 +136,18 @@ end
 %% Project Paths
 
 % General path setup
-analysisDir = [projectDir filesep 'multivariate'];
-studyPath   = [analysisDir filesep 'models/' Analysis.name];
-setenv('analysisPath',analysisDir);
+directory.Analysis = [directory.Project filesep 'multivariate'];
+directory.Model = [directory.Analysis filesep 'models' filesep ...
+    'SingleTrialModel' taskName];
+setenv('analysisPath',directory.Model);
 !mkdir -p $analysisPath
 
-% Select pattern classification analysis. No searchlight is default
-    %classType = questdlg('Select Multivariate Analysis',...
-    %    'Confirm Classification',...
-    %    'MVPA','RSA','ERS','Cancel','MVPA');
-    
-    analysisList = {'MVPA','RSA','ERS'};
-    
-    [index,tf] = listdlg('PromptString','Select Multivariate Analysis:',...
-        'SelectionMode','Single','ListString',analysisList);
-    
-    classType = analysisList{index};
+analysisList = {'MVPA','RSA','ERS'};
+
+[index,tf] = listdlg('PromptString','Select Multivariate Analysis:',...
+    'SelectionMode','Single','ListString',analysisList);
+
+classType = analysisList{index};
 
 % Select analysis type. No searchlight is default
 analysisType = questdlg('Select Analysis Level for Multivariate Test:',...
@@ -162,7 +161,7 @@ regressRT.flag = questdlg('Regress out Reaction Time (RT)?',...
 
 switch analysisType
     case 'Searchlight'
-        roiPath     = [projectDir 'ROIs/searchlight'];
+        roiPath     = [directory.Project 'ROIs/searchlight'];
         searchlight = 'Yes';
     otherwise
         roiPath     = '/path/to/common/mask/folder';
@@ -259,7 +258,7 @@ try
                     'ListSize',[280,300]);
                 tasks=tasks(index);
                 
-                save([projectDir 'vars/tasks.mat'],'tasks');
+                save([Project 'vars/tasks.mat'],'tasks');
                 
             catch
                 warning(['Error in setting ERS analysis flags. '...
@@ -274,7 +273,7 @@ end
 
 try
     % List subject directory
-    subjDir=dir(funcDir);
+    subjDir=dir(rawData.funcDir);
     
     % Remove non-subject directories & possible files in directory
     for i=1:length(subjDir)
@@ -287,8 +286,8 @@ try
         subjects{i,1}=subjDir(i).name;
     end
     
-    !mkdir -p $analysisPath/vars
-    save([analysisDir '/vars/subjects.mat'],'subjects');
+    %!mkdir -p $analysisPath/vars
+    %save([Analysis '/vars/subjects.mat'],'subjects');
     
     clear subjCount i subjDir;
 catch
@@ -298,12 +297,12 @@ end
 %% Assign Conditions
 
 try
-    conds = strsplit(conditions{:},',');
+    conditions = strsplit(conditions{:},',');
     
     subconditionFlag = questdlg('Are there subconditions? (If unsure select No)',...
         'Confirm Subconditions','Yes','No','Cancel','No');
     
-    save([analysisDir '/vars/conds.mat'],'conds');
+    save([Analysis '/vars/conds.mat'],'conds');
     
     switch subconditionFlag
         case 'Yes'
@@ -313,7 +312,7 @@ try
                 'ListSize',[280,300]);
             
             subconds=subconds(index);
-            save([analysisDir '/vars/subconds.mat'],'subconds');
+            %save([Analysis '/vars/subconds.mat'],'subconds');
             subconditionFlag = 'TRUE';
             
         case 'No'
@@ -339,13 +338,13 @@ try
     else
         switch searchlight
             case 'Yes'
-                if ~exist([projectDir 'vars/rois_searchlight.mat'],'file')
+                if ~exist([Project 'vars/rois_searchlight.mat'],'file')
                     resliceFlag='No';
                 else
                     resliceFlag='Yes';
                 end
             otherwise
-                if ~exist([projectDir 'vars/rois.mat'],'file')
+                if ~exist([Project 'vars/rois.mat'],'file')
                     resliceFlag='No';
                 else
                     resliceFlag='Yes';
@@ -357,9 +356,9 @@ try
         case 'Yes'
             switch searchlight
                 case 'Yes'
-                    load([projectDir 'vars/rois_searchlight.mat']);
+                    load([Project 'vars/rois_searchlight.mat']);
                 otherwise
-                    load([projectDir 'vars/rois.mat']);
+                    load([Project 'vars/rois.mat']);
             end
         case 'No'
             
@@ -419,7 +418,7 @@ try
             for i=1:length(regions)
                 datainput=maskList{i};
                 reference=dataDir;
-                output=strcat(projectDir,roiPrefix,regions{i});
+                output=strcat(Project,roiPrefix,regions{i});
                 
                 % Set system/terminal variables
                 setenv('region',regions{i});
@@ -440,14 +439,14 @@ try
             
     end
     
-    roi_path = [projectDir 'ROIs'];
+    roi_path = [Project 'ROIs'];
     
     % Save roi list to separate .mat file
     switch searchlight
         case 'Yes'
-            save([projectDir 'vars/rois_searchlight.mat'],'rois');
+            save([Project 'vars/rois_searchlight.mat'],'rois');
         otherwise
-            save([projectDir 'vars/rois.mat'],'rois');
+            save([Project 'vars/rois.mat'],'rois');
     end
 catch
     warning('Unable to create region list. Set to debug mode.');
@@ -459,15 +458,20 @@ try
     % Set filename for parameter .mat file
     switch analysisType
         case 'Searchlight'
-            filename=strcat(analysisDir,'/params_',preprocPipeline,'_',...
-                analysisName,'_',classType,'_',analysisType,'_',conds{1,1},...
-                '_',conds{1,2},'_subConds_',subconditionFlag,'_Bootstrap_',...
+            filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
+                taskName,'_',classType,'_',analysisType,'_',conditions{1},...
+                '_',conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
                 bootstrap.flag,'_',metric,'_',num2str(searchlightSize),...
                 '.mat');
         otherwise
-            filename=strcat(analysisDir,'/params_',preprocPipeline,'_',...
-                analysisName,'_',classType,'_',analysisType,'_',conds{1,1},...
-                '_',conds{1,2},'_subConds_',subconditionFlag,'_Bootstrap_',...
+            %Working
+            conds=char(conditions);
+            conds=reshape(conds,[1 (size(conds,1)*size(conds,2))]);
+            
+            %End Working
+            filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
+                taskName,'_',classType,'_',analysisType,'_',conditions{1},...
+                '_',conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
                 bootstrap.flag,'.mat');
     end
     
@@ -478,17 +482,15 @@ end
 %% Save Params File
 switch analysisType
     case 'Searchlight'
-        save(filename,'projectDir','funcDir','trialTag','preprocPipeline',...
-            'numDat','analysisName','conditions','Analysis','Model','Mask',...
-            'Func','Mot','analysisDir','studyPath','classType',...
-            'analysisType','regressRT','roiPath','searchlight','bootstrap',...
-            'trialAnalysis','leaveRuns','metric','searchlightSize');
+        save(filename,'directory','rawData','preprocPipeline','taskName',...
+            'dataInfo','conditions','Model','Mask', 'Func','Mot','classType',...
+            'subjects','analysisType','regressRT','roiPath','searchlight',...
+            'bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize');
     otherwise
-        save(filename,'projectDir','funcDir','trialTag','preprocPipeline',...
-            'numDat','analysisName','conditions','Analysis','Model','Mask',...
-            'Func','Mot','analysisDir','studyPath','classType',...
-            'analysisType','regressRT','roiPath','searchlight','bootstrap',...
-            'trialAnalysis','leaveRuns');
+        save(filename,'directory','rawData','preprocPipeline','taskName',...
+            'dataInfo','conditions','Model','Mask', 'Func','Mot','classType',...
+            'subjects','analysisType','regressRT','roiPath','searchlight',...
+            'bootstrap','trialAnalysis','leaveRuns');
 end
 
 clear;

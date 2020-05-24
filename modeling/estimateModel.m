@@ -39,22 +39,20 @@ jobman_option = 'run'; % interactive = show in GUI, run = run through SPM
 %% Routine
 
 clc
-fprintf('Analysis: %s\n\n', Analysis.name)
-fprintf('Gathering Data...\n\n')
 spm('Defaults','FMRI')
 spm_jobman('initcfg')
 
-for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
+for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     
     fprintf('\n')
-    fprintf('Subject: %s\n\n',Subjects{curSub})
+    fprintf('Subject: %s\n\n',subjects{curSub})
     
     % Model Directory: directory containing this subject's model
-    Model.directory = fullfile(Analysis.directory, Subjects{curSub});
+    Model.directory = fullfile(directory.Model, subjects{curSub});
     
     % If we are using a mask, create a path to the mask
     if Mask.on == 1
-        Model.mask  = fullfile(Mask.dir, Subjects{curSub}, Mask.name);
+        Model.mask  = fullfile(Mask.dir, subjects{curSub}, Mask.name);
     end
     
     % Find the SpecModel *.mat files. These should be in the model
@@ -70,18 +68,47 @@ for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
     % Determine number of runs from number of Model Spec *.mat files found
     NumOfRuns = length(SpecModelMats);
     
-    for i = 1:NumOfRuns
-        fprintf('Run: %d\n', i)
-        curFuncDir              = fullfile...
-            (Func.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
-        curMotDir               = fullfile...
-            (Mot.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
-        Model.runs{i}.scans     = cellstr...
-            (spm_select('ExtFPList', curFuncDir, Func.wildcard, Inf));
-        Model.runs{i}.multicond = fullfile...
-            (Model.directory, SpecModelMats{i});        % from Model Spec
-        Model.runs{i}.motion    = spm_select...
-            ('FPList', curMotDir, Func.motwildcard); % from realignment
+    switch preprocPipeline
+        case 'SPM12'
+            
+            for i = 1:NumOfRuns
+                fprintf('Run: %d\n', i)
+                curFuncDir = fullfile(Func.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
+                curMotDir = fullfile(Mot.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
+                Model.runs{i}.scans = cellstr(spm_select('ExtFPList', curFuncDir, Func.wildcard, Inf));
+                Model.runs{i}.multicond = fullfile(Model.directory, SpecModelMats{i});        % from Model Spec
+                Model.runs{i}.motion = spm_select('FPList', curMotDir, Func.motwildcard); % from realignment
+            end
+            
+            
+        case 'fMRIPrep'
+            
+            motionFiles = dir(fullfile(directory.Model, subjects{curSub},...
+                ['*' taskName '*.txt']));
+            
+            rawFuncFiles = dir(fullfile(directory.Project, 'preprocessing',...
+                'fmriprep', subjects{curSub}, 'func', ['*' taskName '*_bold.nii.gz']));
+            
+            for i = 1:NumOfRuns
+                curFuncDir = fullfile(directory.Project, 'preprocessing',...
+                    'fmriprep', subjects{curSub}, 'func');
+                
+                % Copy raw functional to Model Directory and gunzip
+                setenv('data',[rawFuncFiles(i).folder filesep rawFuncFiles(i).name]);
+                setenv('dest',[fullfile(directory.Model, subjects{curSub})]);
+                setenv('modelData',[fullfile(directory.Model, subjects{curSub},...
+                    rawFuncFiles(i).name)]);
+                !cp $data $dest
+                !gunzip $modelData
+            
+                Model.runs{i}.scans = cellstr(spm_select('ExtFPList', ...
+                    fullfile(directory.Model, subjects{curSub}), ...
+                    ['^*enc_run-' num2str(i)], Inf));
+                Model.runs{i}.multicond = fullfile(Model.directory, SpecModelMats{i});        % from Model Spec
+                Model.runs{i}.motion = [motionFiles(i).folder filesep motionFiles(i).name]; % from realignment
+            
+            end
+            
     end
     
     %% Set and Save the SPM job
@@ -171,21 +198,35 @@ for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
             spm_jobman(jobman_option, matlabbatch)
         catch ER %#ok<*NASGU>
             disp(ER)
-            fprintf('ERROR ON: %s', Subjects{curSub})
+            fprintf('ERROR ON: %s', subjects{curSub})
         end
     end
     
-    % Gzip all functionals
-    subjFuncDir = fullfile(Func.dir, Subjects{curSub},'func');
-    setenv('subjFuncDir',subjFuncDir);
-    !gzip $subjFuncDir/*/*.nii
+    %% Manage resulting files
+    switch preprocPipeline
+        case 'SPM12'
+            % Gzip all functionals
+            subjFuncDir = fullfile(Func.dir, subjects{curSub},'func');
+            setenv('subjFuncDir',subjFuncDir);
+            
+            % Gzip output model
+            !gzip $subjFuncDir/*/*.nii
+            
+        case 'fMRIPrep'
+            % Remove copied functional data from model directory
+            !rm $dest/*_bold.nii
+            
+            % Gzip output model
+            !gzip $dest/*.nii
+            
+    end
     
     % Create new SPM mat file for gzip nifti files
-    load([studyPath filesep Subjects{curSub} filesep 'SPM.mat']);
+    load([directory.Model filesep subjects{curSub} filesep 'SPM.mat']);
     for i=1:length(SPM.Vbeta)
         SPM.Vbeta(i).fname = strrep(SPM.Vbeta(i).fname,'nii','nii.gz');
     end
-    save([studyPath filesep Subjects{curSub} filesep 'SPM_gz.mat'],'SPM');
+    save([directory.Model filesep subjects{curSub} filesep 'SPM_gz.mat'],'SPM');
     
     clear SpecModelMats NumOfRuns curFuncDir curMotDir matlabbatch SPM;
     Model = rmfield(Model,'runs');
@@ -194,4 +235,6 @@ for curSub = 1:length(Subjects) %for curSub = number %1:length(Subjects)
     
 end
 
+clear;
+clc;
 disp('All finished!!');

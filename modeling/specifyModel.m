@@ -40,197 +40,75 @@ if exist('flag','var')==0
 end
 
 %% Main Code
-
-% Clean up and print update to the command window
-clc;
-fprintf('Model: %s\n\n', Analysis.name)
-fprintf('Model Directory: \n')
-disp(Analysis.directory)
-fprintf('\n')
-fprintf('Behavioral Data Directory: \n')
-disp(Analysis.behav.directory)
-fprintf('\n')
-
-% Subject Loop
-for i = 1:length(Subjects)
+for i = 1:length(subjects)
     
     % Creates path to the current subjects behavioral file
-    curSubj.behavDir  = [Analysis.behav.directory '/' Subjects{i}];
-    curSubj.behavFile = dir([curSubj.behavDir Analysis.behav.regexp]);
+    curSubj.behavDir  = [directory.Project filesep rawData.behavDir filesep...
+        subjects{i} filesep 'behav'];
+    curSubj.behavFile = dir([curSubj.behavDir filesep ...
+        '*' taskName '*.' rawData.behavFile]);
     
-    % Reads in the subjects behavioral data using the readtable command.
-    % See readtable for more details.
-    fprintf('Reading in subject %s behavioral data ...\n', Subjects{i});
-    BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name]);
-    
-    % Clean up variable names
-    BehavData.Properties.VariableNames = regexprep(regexprep...
-        (BehavData.Properties.VariableNames, '_', ''), '^x', '');
+    if length(length(curSubj.behavFile))==1
+        % Reads in the subjects behavioral data using the readtable command.
+        % See readtable for more details.
+        fprintf('Reading in subject %s behavioral data ...\n', subjects{i});
+        BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name]);
+        
+        % Clean up variable names
+        BehavData.Properties.VariableNames = regexprep(regexprep...
+            (BehavData.Properties.VariableNames, '_', ''), '^x', '');
+    end
     
     % Creates a path to this subjects analysis directory & creates that
     % directory if it does not already exist.
-    curSubj.directory = fullfile(Analysis.directory, Subjects{i});
+    curSubj.directory = fullfile(directory.Model, subjects{i});
     if ~isdir(curSubj.directory)
         mkdir(curSubj.directory)
     end
     
     % Initalize the counter cell array to track number of trials in each functional run
-    number_of_runs = max(unique(BehavData.block));
+    %number_of_runs = max(unique(BehavData.block));
     fprintf('Sorting Behavioral Data...\n\n')
     
     % Build the multiple conditions *.mat file for each run
-    for curRun = 1:number_of_runs
+    for curRun = 1:dataInfo.Runs
+        
+        if length(length(curSubj.behavFile))>1
+            % Reads in the subjects behavioral data using the readtable command.
+            % See readtable for more details.
+            fprintf('Reading in subject %s behavioral data ...\n', subjects{i});
+            BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name]);
+            
+            % Clean up variable names
+            BehavData.Properties.VariableNames = regexprep(regexprep...
+                (BehavData.Properties.VariableNames, '_', ''), '^x', '');
+        end
         
         %-- Initialize the names, onsets, durations, and pmods structure arrays
         % This section preallocates the names, onsets, and durations
         % structure arrays.
         
         % Convert raw onset column from msec to sec (divide by 1000)
-        onsets = num2cell(BehavData.rawonset(BehavData.block == curRun)/1000)';
+        onsets = num2cell(BehavData.Onset(BehavData.Run == curRun)/1000)';
         
         % Set trial duration to zero for each trial, a stick function
-        number_of_trials = length(onsets);
+        number_of_trials = length(onsets);  % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
         durations        = num2cell(zeros(1,number_of_trials));
+        %durations        = num2cell(zeros(1,dataInfo.Trials));
         
         % Initialize cell of trial names
-        currRunIDs = find(BehavData.block == curRun);
-        names   = cell(1,number_of_trials);
+        currRunIDs = find(BehavData.Run == curRun);
+        names   = cell(1,number_of_trials); % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
+        %names   = cell(1,dataInfo.Trials);
         
         % Loop over all the trials in current run
-        for ii = 1:number_of_trials
+        for ii = 1:number_of_trials % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
+            % for ii = 1:dataInfo.Trials
             
-            switch analysisName
-                case 'TaskA'
-                    try
-                        %%% pull variables to add to the trial file name
-                        % image names
-                        
-                        % change pic1 to pic for retrieval
-                        imageFace = erase(BehavData.pic1(currRunIDs(ii)),'.\faces\');
-                        imageScene = erase(BehavData.pic2(currRunIDs(ii)),'.\scenes\scenes\');
-                        imageFace = erase(imageFace,'"');
-                        imageScene = erase(imageScene,'"');
-                        imageFace = strrep(imageFace,'''','');
-                        imageScene = strrep(imageScene,'''','');
-                        
-                        % Merge image names
-                        imagename = strcat(imageFace{1,1},'|',imageScene{1,1});
-                        
-                        % Study trial type
-                        if BehavData.StudyTT(currRunIDs(ii)) == 0
-                            studyType       = 'Trained';
-                        elseif BehavData.StudyTT(currRunIDs(ii)) == 1
-                            studyType       = 'Novel';
-                        end
-                        
-                        % Retrieval trial type
-                        if BehavData.RetTT(currRunIDs(ii)) == 0
-                            retType         = 'Target';
-                        elseif BehavData.RetTT(currRunIDs(ii)) == 1
-                            retType         = 'Lure';
-                        end
-                        
-                        % Difference-Memory score (DMscore)
-                        switch BehavData.DMscore(currRunIDs(ii))
-                            case 1 % Miss or False Alarm
-                                if BehavData.RetTT(currRunIDs(ii)) == 0
-                                    dmScore = 'Miss';
-                                else
-                                    dmScore = 'FalseAlarm';
-                                end
-                            case 2 % Familiar or Slight False Alarm
-                                if BehavData.RetTT(currRunIDs(ii)) == 0
-                                    dmScore = 'Familiar';
-                                else
-                                    dmScore = 'SlightFalseAlarm';
-                                end
-                            case 3 % Hit or Crrect Rejection
-                                if BehavData.RetTT(currRunIDs(ii)) == 0
-                                    dmScore = 'Hit';
-                                else
-                                    dmScore = 'CorrectRejection';
-                                end
-                            otherwise
-                                dmScore = 'NoBehaviorRecorded';
-                        end
-                        
-                        % informative, unique, BIDS style trial name
-                        names{ii} = sprintf...
-                            ('imagename-%s_studyType-%s_retType-%s_dmScore%s',...
-                            imagename, studyType, retType, dmScore);
-                        
-                        ersTags{curRun,ii}=sprintf('imagename-%s_studyType-%s',...
-                            imagename, studyType);
-                        
-                        clear imagename studyType retType dmScore;
-                    catch
-                        msgbox('Error specifiying encoding conditions.');
-                    end
-                    
-                case 'TaskB'
-                    try
-                        %%% pull variables to add to the trial file name
-                        % image names
-                        
-                        % change pic1 to pic for retrieval
-                        imageFace = erase(BehavData.pic(currRunIDs(ii)),'.\faces\');
-                        imageScene = erase(BehavData.pic2(currRunIDs(ii)),'.\scenes\scenes\');
-                        imageFace = erase(imageFace,'"');
-                        imageScene = erase(imageScene,'"');
-                        imageFace = strrep(imageFace,'''','');
-                        imageScene = strrep(imageScene,'''','');
-                        
-                        % Merge image names
-                        imagename = strcat(imageFace{1,1},'|',imageScene{1,1});
-                        
-                        % Study trial type
-                        switch BehavData.familiarnovel(ii)
-                            case 0
-                                studyType       = 'Trained';
-                            case 1
-                                studyType       = 'Novel';
-                            case 99
-                                studyType       = 'Recombined';
-                        end
-                        
-                        % Difference-Memory score (DMscore)
-                        switch BehavData.score(ii)
-                            case 1 % Miss or False Alarm
-                                if BehavData.type(ii) == 0
-                                    dmScore = 'Miss';
-                                else
-                                    dmScore = 'FA';
-                                end
-                            case 2 % Familiar or Slight False Alarm
-                                if BehavData.type(ii) == 0
-                                    dmScore = 'Fam-Hit';
-                                else
-                                    dmScore = 'FA';
-                                end
-                            case 3 % Hit or Correct Rejection
-                                if BehavData.type(ii) == 0
-                                    dmScore = 'Rec-Hit';
-                                else
-                                    dmScore = 'CR';
-                                end
-                            otherwise
-                                dmScore = 'NoBehaviorRecorded';
-                        end
-                        
-                        % informative, unique, BIDS style trial name
-                        names{ii} = sprintf...
-                            ('imagename-%s_studyType-%s_dmScore%s',...
-                            imagename, studyType,  dmScore);
-                        
-                        ersTags{curRun,ii}=sprintf('imagename-%s_studyType-%s',...
-                            imagename, studyType);
-                        
-                        clear imagename studyType  dmScore;
-                    catch
-                        msgbox('Error specifiying retrieval conditions.');
-                    end
-                    
-            end
+            names{ii} = sprintf('trial-%s_condition-%s_retType-%s_dmScore-%s',...
+                char(num2str(currRunIDs(ii))),...
+                char(BehavData.EncodingCond(currRunIDs(ii))),...
+                'Hit', char(BehavData.DMscore(currRunIDs(ii))));
             
         end
         
@@ -241,7 +119,7 @@ for i = 1:length(Subjects)
         matfilename = fullfile(curSubj.directory, ...
             ['Run', num2str(curRun, '%03d'), '_multiple_conditions.mat']);
         fprintf('Saving subject %s run %d multiple conditions file...\n',...
-            Subjects{i}, curRun)
+            subjects{i}, curRun)
         save(matfilename, 'names', 'onsets', 'durations');
         
         % Summary Trial Numbers
@@ -257,7 +135,7 @@ for i = 1:length(Subjects)
         end
         
         if curRun==1
-            finalSummary{i+1,1}=Subjects{i};
+            finalSummary{i+1,1}=subjects{i};
             finalIndex=[2:4];
         end
         
@@ -269,15 +147,15 @@ for i = 1:length(Subjects)
         
     end
     
-    ersTagFilename = fullfile(curSubj.directory,'ersTags.mat');
-    save(ersTagFilename,'ersTags');
+    %ersTagFilename = fullfile(curSubj.directory,'ersTags.mat');
+    %save(ersTagFilename,'ersTags');
         
 end
 
 
 %% Write output summary file
 
-file = fopen([study_path filesep 'allTrialsSummary.csv'], 'w');
+file = fopen([directory.Model filesep 'allTrialsSummary.csv'], 'w');
 
 for a=1:size(finalSummary,1)
     for b=1:size(finalSummary,2)

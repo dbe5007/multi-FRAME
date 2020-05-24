@@ -46,10 +46,9 @@ switch preprocPipeline
         
         % Add SPM12 to path
         addpath('/directory/to/spm12');
-        %dataDir = [projDir '/rawdata'];
-        dataDir = funcDir;
-        processDir = [projectDir '/derivatives/spmPreprocessing'];
-        setenv('dataDir',dataDir);
+        %dataDir = rawData.funcDir;
+        processDir = [directory.Project '/derivatives/spmPreprocessing'];
+        setenv('dataDir',rawData.funcDir);
         setenv('processDir',processDir);
         
         % Set file and folder wildcard expressions
@@ -67,7 +66,7 @@ switch preprocPipeline
         !mkdir -p $processDir/psfiles;
         
     case 'fMRIPrep'
-        dataDir = [projectDir '/preprocessing/fmriprep'];
+        dataDir = [directory.Project '/preprocessing/fmriprep'];
 end
 
 if exist('commandFlag','var')==0
@@ -92,7 +91,7 @@ if exist('commandFlag','var')==0
                     return;
             end
             
-            funcFolders = dir(dataDir);
+            funcFolders = dir(rawData.funcDir);
             
             for i=1:length(funcFolders)
                 subFlag(i) = ~isempty(strfind(funcFolders(i).name,'sub-'));
@@ -127,7 +126,7 @@ if exist('commandFlag','var')==0
 else
     
     subjListFlag = 'All Subjects';
-    funcFolders = dir(dataDir);
+    funcFolders = dir(rawData.funcDir);
     
     for i=1:length(funcFolders)
         subFlag(i) = ~isempty(strfind(funcFolders(i).name,'sub-'));
@@ -174,7 +173,7 @@ switch preprocPipeline
             % Copy & unzip functionals
             !mkdir -p $processDir/$subject/func
             
-            copyTaskRun = ['cp $dataDir/$subject/func/*' analysisName ...
+            copyTaskRun = ['cp $dataDir/$subject/func/*' taskName ...
                 '*nii.gz $processDir/$subject/func'];
             system(copyTaskRun);
             
@@ -182,7 +181,7 @@ switch preprocPipeline
             !gunzip $processDir/$subject/func/sub*
             
             % Create separate directories for each run
-            for i=1:numDat.Runs
+            for i=1:dataInfo.Runs
                 makeRunDir = ['mkdir -p $processDir/$subject/func/run' num2str(i)];
                 system(makeRunDir);
                 
@@ -243,8 +242,8 @@ switch preprocPipeline
                         matlabbatch{i}.spm.temporal.st.ta       = Model.TR-(Model.TR/58);
                         %matlabbatch{i}.spm.temporal.st.so       = [2:2:58 1:2:58];   %Even slices collected 1st, then odds; start foot to head
                         matlabbatch{i}.spm.temporal.st.so       = [1:2:42 2:2:42];   %Odd slices collected 1st, then odds; start foot to head
-                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:numDat.Slices 1:2:numDat.Slices];   %Even slices collected 1st, then odds; start foot to head
-                        %matlabbatch{i}.spm.temporal.st.so       = [1:2:numDat.Slices 2:2:numDat.Slices];   %Odd slices collected 1st, then odds; start foot to head
+                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:dataInfo.Slices 1:2:dataInfo.Slices];   %Even slices collected 1st, then odds; start foot to head
+                        %matlabbatch{i}.spm.temporal.st.so       = [1:2:dataInfo.Slices 2:2:dataInfo.Slices];   %Odd slices collected 1st, then odds; start foot to head
                         matlabbatch{i}.spm.temporal.st.refslice = 2;
                         matlabbatch{i}.spm.temporal.st.prefix   = 'a';
                         
@@ -382,7 +381,7 @@ switch preprocPipeline
             setenv('outputDir',[studyPath filesep csub{:}]);
             !mkdir -p $outputDir
             
-            for j=1:numDat.Runs
+            for j=1:dataInfo.Runs
                 copyMotion = ['cp -p $processDir/$subject/func/run' num2str(j)...
                     '/rp* $outputDir/$subject"_task-' analysisName '_run_'...
                     num2str(j) '_motionRegressors.txt"'];
@@ -423,11 +422,12 @@ switch preprocPipeline
         for i=1:length(subfolders)
             
             % Read covariates file
-            tsvFiles = dir([subfolders(i).folder '/' subfolders(i).name '/func/*' analysisName '*confound*.tsv']);
+            tsvFiles = dir([dataDir '/' subfolders(i).name '/func/*' ...
+                taskName '*confound*.tsv']);
             
             if length(tsvFiles)~=0
                 % Make output folder
-                setenv('outputDir',[studyPath filesep subfolders(i).name]);
+                setenv('outputDir',[directory.Model filesep subfolders(i).name]);
                 !mkdir -p $outputDir
             end
             
@@ -453,7 +453,7 @@ switch preprocPipeline
                 
                 % Write new function for writetable - issue in 2019
                 
-                writetable(T,[studyPath filesep subfolders(i).name filesep...
+                writetable(T,[directory.Model filesep subfolders(i).name filesep...
                     filename],'Delimiter',' ','WriteVariableNames',false);
                 
                 clear rawCovariates T filename;
@@ -463,3 +463,7 @@ switch preprocPipeline
         end
 end
 
+clear;
+clc;
+disp('All finished!!');
+            
