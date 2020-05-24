@@ -114,18 +114,14 @@ try
     switch preprocPipeline
         case 'SPM12'
             Func.dir         = [directory.Project filesep rawData.funcDir];
-            Func.wildcard    = '^warun.*\.nii'; % File
-            Mot.dir          = [directory.Project filesep rawData.funcDir];
-            Func.motwildcard = '^rp_.*\.txt';
+            Func.wildcard    = '^ar.*\.nii'; % File
             dataInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
                 'Number of Slices',[1 35],{'50'});
             dataInfo.Slices = str2double(dataInfo.Slices{:});
             
         case 'fMRIPrep'
             Func.dir         = [directory.Project filesep rawData.funcDir];
-            Func.wildcard    = ['*\' taskName '.*\.nii.gz']; % File
-            Mot.dir          = [directory.Project filesep rawData.funcDir];
-            Func.motwildcard = ['*\taskName.*\.' rawData.behavFile];
+            Func.wildcard    = ['^*' taskName '_run-']; % File
             
     end
     
