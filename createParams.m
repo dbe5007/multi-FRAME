@@ -7,7 +7,10 @@
 %
 %   Updated:   5/22/20
 %
-%   Reorganized script to handle variable preprocessing.
+%   Major Updates:
+%   -Removed ROI processing. Only directories are handled now
+%   -fMRIPrep output data is not integrated into the pipeline
+%   -Reorganized script to handle variable preprocessing.
 %
 %   Updated:   9/19/19
 %
@@ -69,30 +72,40 @@ rawData.behavFile = rawData.behavFile{:};
 if exist('commandFlag','var')==0
     preprocPipeline = questdlg('Select Preprocessing Pipeline',...
         'Confirm Pipeline',...
-        'SPM12','fMRIPrep','Cancel','fMRIPrep');
+        'spm12','fmriprep','Cancel','fmriprep');
 else
-    preprocPipeline = 'fMRIPrep';
+    preprocPipeline = 'fmriprep';
 end
 
+%% Task and Data Information
+
 try
-    %% Task and Data Information
-    taskName = inputdlg('Enter Task Name: [as written in functional filename]',...
+    % Task Name
+    taskInfo.Name = inputdlg('Enter Task Name: [as written in functional filename]',...
         'Task Name',[1 35],{'e.g. encoding, nback, rest'});
-    taskName = taskName{:};
+    taskInfo.Name = taskInfo.Name{:};
     
-    conditions = inputdlg('Enter Conditions of Interest: [separated by commas]',...
+    % Conditions of Interest
+    taskInfo.Conditions = inputdlg('Enter Conditions of Interest: [separated by commas]',...
         'Conditions',[1 35],{'e.g. face, object, place'});
-    dataInfo.Datapoints = inputdlg('How many volumes [Length of task]?',...
+    
+    % Conditions of Interest
+    taskInfo.accuracyFlag = questdlg('Is accuracy possoble? (i.e. interactive vs. static task)',...
+        'Confirm Accuracy Potential',...
+        'Yes','No','Cancel','No');
+    
+    % Length of task (in volumes)
+    taskInfo.Datapoints = inputdlg('How many volumes [Length of task]?',...
         'Volume Number',[1 35],{'150'});
-    dataInfo.Datapoints = str2double(dataInfo.Datapoints{:});
+    taskInfo.Datapoints = str2double(taskInfo.Datapoints{:});
     
-    dataInfo.Runs = inputdlg('How many runs [# of functional runs]?',...
+    taskInfo.Runs = inputdlg('How many runs [# of functional runs]?',...
         'Number of Runs',[1 35],{'1'});
-    dataInfo.Runs = str2double(dataInfo.Runs{:});
+    taskInfo.Runs = str2double(taskInfo.Runs{:});
     
-    dataInfo.Trials = inputdlg('How many trials per run [sum trials for all conditions]?',...
+    taskInfo.Trials = inputdlg('How many trials per run [sum trials for all conditions]?',...
         'Volume Number',[1 35],{'40'});
-    dataInfo.Trials = str2double(dataInfo.Trials{:});
+    taskInfo.Trials = str2double(taskInfo.Trials{:});
     
     
     %% Set Project-Specific Variables
@@ -115,9 +128,9 @@ try
         case 'SPM12'
             Func.dir         = [directory.Project filesep rawData.funcDir];
             Func.wildcard    = '^ar.*\.nii'; % File
-            dataInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
+            taskInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
                 'Number of Slices',[1 35],{'50'});
-            dataInfo.Slices = str2double(dataInfo.Slices{:});
+            taskInfo.Slices = str2double(taskInfo.Slices{:});
             
         case 'fMRIPrep'
             Func.dir         = [directory.Project filesep rawData.funcDir];
@@ -198,21 +211,9 @@ try
             % Compute MVPA with entire run to train/test or individual
             % trials to train/test
             try
-                %if exist('commandFlag','var')==0
-                %trialAnalysis = questdlg('Test/Train on Runs or Trials',...
-                %'Confirm Trial/Run',...
-                %'Run','Trial','Cancel','Run');
-                %else
                 trialAnalysis = 'Run';
-                %end
                 
-                %if strcmpi(trialAnalysis,'Trial')==1
-                %leaveRuns = questdlg('Number of Trials to Test',...
-                %'Confirm Trial Tests',...
-                %'One','Two','Cancel','Run');
-                %else
                 leaveRuns = NaN;
-                %end
                 
                 if strcmpi(analysisType, 'Searchlight')==1
                     metric = questdlg('Searchlight Metric',...
@@ -233,14 +234,8 @@ try
             % Compute RSA with mean activation pattern (average all trials)
             % or individual trial pattern (all trials are separate)
             try
-                %if exist('commandFlag','var')==0
-                %trialAnalysis = questdlg('Individual or Mean Conditions',...
-                %'Confirm Trial/Run',...
-                %'Individual','Mean','Cancel','Individual');
-                %else
                 trialAnalysis = 'Individual';
                 
-                %end
             catch
                 warning(['Error in setting RSA analysis flags. '...
                     'Set to debug mode.']);
@@ -293,7 +288,7 @@ end
 %% Assign Conditions
 
 try
-    conditions = strsplit(conditions{:},',');
+    taskInfo.Conditions = strsplit(taskInfo.Conditions{:},',');
     
     subconditionFlag = questdlg('Are there subconditions? (If unsure select No)',...
         'Confirm Subconditions','Yes','No','Cancel','No');
@@ -319,135 +314,6 @@ catch
     warning('Unable to assign conditions. Set to debug mode.');
 end
 
-
-%% Create ROI List
-
-try
-    % Flag to reslice regions/load in previously resliced regions. No is
-    % default
-    
-    % Interactive run asks user input - command line defaults to reslice if roi
-    % mat file is missing
-    if ~exist('commandFlag','var')
-        resliceFlag=questdlg('Are ROIs in subject space?','Confirm Reslicing',...
-            'Yes','No','Cancel','No');
-    else
-        switch searchlight
-            case 'Yes'
-                if ~exist([Project 'vars/rois_searchlight.mat'],'file')
-                    resliceFlag='No';
-                else
-                    resliceFlag='Yes';
-                end
-            otherwise
-                if ~exist([Project 'vars/rois.mat'],'file')
-                    resliceFlag='No';
-                else
-                    resliceFlag='Yes';
-                end
-        end
-    end
-    
-    switch resliceFlag
-        case 'Yes'
-            switch searchlight
-                case 'Yes'
-                    load([Project 'vars/rois_searchlight.mat']);
-                otherwise
-                    load([Project 'vars/rois.mat']);
-            end
-        case 'No'
-            
-            % Get subject directories
-            % dataDir=[study_path filesep subjects{1} filesep 'beta_0001.nii'];
-            dataDir = [serverPath funcDir filesep subjects{1}...
-                '_spm12' filesep 'run1encoding' filesep 'warun1encoding.nii'];
-            
-            % Load in lab ROIs
-            maskFolders=dir(roi_path);
-            maskFolders(1:2)=[];
-            maskCount=1;
-            
-            % Get lists of possible masks in common LabMasks folder
-            switch analysisType
-                case 'Searchlight'
-                    % Set prefix for save path
-                    roiPrefix='ROIs/searchlight/reslice_';
-                    
-                    for i=1:length(maskFolders)
-                        if maskFolders(i).isdir==0
-                            maskName{maskCount}=maskFolders(i).name;
-                            maskList{maskCount}=[maskFolders(i).folder...
-                                filesep maskFolders(i).name];
-                            maskCount=maskCount+1;
-                        end
-                    end
-                otherwise
-                    % Set prefix for save path
-                    roiPrefix='ROIs/reslice_';
-                    
-                    % Search through all folders and create list of masks
-                    for i=1:length(maskFolders)
-                        
-                        folder=dir([maskFolders(i).folder filesep maskFolders(i).name]);
-                        folder(1:2)=[];
-                        
-                        for ii=1:length(folder)
-                            if folder(ii).isdir==0
-                                maskName{maskCount}=folder(ii).name;
-                                maskList{maskCount}=[folder(ii).folder...
-                                    filesep folder(ii).name];
-                                maskCount=maskCount+1;
-                            end
-                        end
-                    end
-            end
-            
-            % Drop-down list of found masks - select all that apply
-            [index,tf] = listdlg('Name','Available Masks',...
-                'PromptString','Ctrl+Click to choose masks:',...
-                'ListString',maskName,...
-                'ListSize',[280,300]);
-            maskList=maskList(index);
-            regions=maskName(index);
-            
-            for i=1:length(regions)
-                datainput=maskList{i};
-                reference=dataDir;
-                output=strcat(Project,roiPrefix,regions{i});
-                
-                % Set system/terminal variables
-                setenv('region',regions{i});
-                setenv('datainput',datainput);
-                setenv('reference',reference);
-                setenv('output',output);
-                
-                % Skip previously resliced regions - AFNI will NOT
-                % overwrite!!!
-                if ~exist(output,'file')
-                    % Call AFNI from system/terminal to fit region to subject space
-                    !echo "Fitting $region to subject functional..."
-                    !3dresample -master $reference -prefix $output -input $datainput
-                end
-                
-                rois{1,i}=strcat('reslice_',regions{i});
-            end
-            
-    end
-    
-    roi_path = [Project 'ROIs'];
-    
-    % Save roi list to separate .mat file
-    switch searchlight
-        case 'Yes'
-            save([Project 'vars/rois_searchlight.mat'],'rois');
-        otherwise
-            save([Project 'vars/rois.mat'],'rois');
-    end
-catch
-    warning('Unable to create region list. Set to debug mode.');
-end
-
 %% Set filename for output
 
 try
@@ -455,19 +321,19 @@ try
     switch analysisType
         case 'Searchlight'
             filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
-                taskName,'_',classType,'_',analysisType,'_',conditions{1},...
-                '_',conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
+                taskInfo.Name,'_',classType,'_',analysisType,'_',taskInfo.Conditions{1},...
+                '_',taskInfo.Conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
                 bootstrap.flag,'_',metric,'_',num2str(searchlightSize),...
                 '.mat');
         otherwise
             %Working
-            conds=char(conditions);
+            conds=char(taskInfo.Conditions);
             conds=reshape(conds,[1 (size(conds,1)*size(conds,2))]);
             
             %End Working
             filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
-                taskName,'_',classType,'_',analysisType,'_',conditions{1},...
-                '_',conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
+                taskInfo.Name,'_',classType,'_',analysisType,'_',Conditions{1},...
+                '_',Conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
                 bootstrap.flag,'.mat');
     end
     
@@ -478,13 +344,13 @@ end
 %% Save Params File
 switch analysisType
     case 'Searchlight'
-        save(filename,'directory','rawData','preprocPipeline','taskName',...
-            'dataInfo','conditions','Model','Mask', 'Func','Mot','classType',...
+        save(filename,'directory','rawData','preprocPipeline',...
+            'taskInfo','Model','Mask', 'Func','Mot','classType',...
             'subjects','analysisType','regressRT','roiPath','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize');
     otherwise
-        save(filename,'directory','rawData','preprocPipeline','taskName',...
-            'dataInfo','conditions','Model','Mask', 'Func','Mot','classType',...
+        save(filename,'directory','rawData','preprocPipeline',...
+            'taskInfo','Model','Mask', 'Func','Mot','classType',...
             'subjects','analysisType','regressRT','roiPath','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns');
 end

@@ -442,7 +442,7 @@ switch preprocPipeline
                 % Convert Rotation millimeters to Radians to fit SMP12
                 for k=4:6
                     
-                    temp = T{:,k}./50; %Convert to mm by multiplying radians by 50mm radius - see Power framewise displacement paper
+                    temp = T{:,k}./50; %Convert radians to mm by dividing mm by 50mm radius - see Power framewise displacement paper
                     T{:,k} = temp;
                     
                     clear temp;
