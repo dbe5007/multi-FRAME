@@ -68,25 +68,40 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     % Determine number of runs from number of Model Spec *.mat files found
     NumOfRuns = length(SpecModelMats);
     
+    % Get directory of motion files
+    motionFiles = dir(fullfile(directory.Model, subjects{curSub},...
+                ['*' taskName '*.txt']));
+    
     switch preprocPipeline
         case 'SPM12'
             
+            procDataDir = fullfile(directory.Project, 'derivatives',...
+                'spmPreprocessing');
+            
+            procFuncFiles = dir(fullfile(procDataDir, subjects{curSub},...
+                'func', 'run*',['ar*' taskName '*.nii.gz']));
+            
             for i = 1:NumOfRuns
-                fprintf('Run: %d\n', i)
-                curFuncDir = fullfile(Func.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
-                curMotDir = fullfile(Mot.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
-                Model.runs{i}.scans = cellstr(spm_select('ExtFPList', curFuncDir, Func.wildcard, Inf));
+                % Gunzip functional file
+                
+                setenv('modelData',[procFuncFiles(i).folder filesep procFuncFiles(i).name]);
+                !gunzip $modelData
+                
+                %fprintf('Run: %d\n', i)
+                %curFuncDir = fullfile(procDataDir, subjects{curSub}, ['func/run' num2str(i)]);
+                %curMotDir = fullfile(Mot.dir, [Subjects{curSub} '_spm12'], [Runs{i} suffix]);
+                
+                %Model.runs{i}.scans = cellstr(spm_select('ExtFPList', curFuncDir, Func.wildcard, Inf));
+                Model.runs{i}.scans = cellstr(spm_select('ExtFPList', ...
+                    procFuncFiles(i).folder, Func.wildcard, Inf));
                 Model.runs{i}.multicond = fullfile(Model.directory, SpecModelMats{i});        % from Model Spec
-                Model.runs{i}.motion = spm_select('FPList', curMotDir, Func.motwildcard); % from realignment
+                Model.runs{i}.motion = [motionFiles(i).folder filesep motionFiles(i).name];
             end
             
             
         case 'fMRIPrep'
             
-            motionFiles = dir(fullfile(directory.Model, subjects{curSub},...
-                ['*' taskName '*.txt']));
-            
-            rawFuncFiles = dir(fullfile(directory.Project, 'preprocessing',...
+            procFuncFiles = dir(fullfile(directory.Project, 'preprocessing',...
                 'fmriprep', subjects{curSub}, 'func', ['*' taskName '*_bold.nii.gz']));
             
             for i = 1:NumOfRuns
@@ -94,16 +109,16 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
                     'fmriprep', subjects{curSub}, 'func');
                 
                 % Copy raw functional to Model Directory and gunzip
-                setenv('data',[rawFuncFiles(i).folder filesep rawFuncFiles(i).name]);
+                setenv('data',[procFuncFiles(i).folder filesep procFuncFiles(i).name]);
                 setenv('dest',[fullfile(directory.Model, subjects{curSub})]);
                 setenv('modelData',[fullfile(directory.Model, subjects{curSub},...
-                    rawFuncFiles(i).name)]);
+                    procFuncFiles(i).name)]);
                 !cp $data $dest
                 !gunzip $modelData
             
                 Model.runs{i}.scans = cellstr(spm_select('ExtFPList', ...
                     fullfile(directory.Model, subjects{curSub}), ...
-                    ['^*enc_run-' num2str(i)], Inf));
+                    [Func.wildcard num2str(i)], Inf));
                 Model.runs{i}.multicond = fullfile(Model.directory, SpecModelMats{i});        % from Model Spec
                 Model.runs{i}.motion = [motionFiles(i).folder filesep motionFiles(i).name]; % from realignment
             
@@ -205,12 +220,14 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     %% Manage resulting files
     switch preprocPipeline
         case 'SPM12'
-            % Gzip all functionals
-            subjFuncDir = fullfile(Func.dir, subjects{curSub},'func');
+            % Set Gzip directories
+            subjFuncDir = fullfile(directory.Model, subjects{curSub});
+            setenv('procDataDir',[procDataDir filesep subjects{curSub}]);
             setenv('subjFuncDir',subjFuncDir);
             
             % Gzip output model
-            !gzip $subjFuncDir/*/*.nii
+            !gzip $subjFuncDir/*.nii
+            !gzip $procDataDir/func/*/*.nii
             
         case 'fMRIPrep'
             % Remove copied functional data from model directory

@@ -152,18 +152,18 @@ switch preprocPipeline
         spm_jobman('initcfg')    % Configure the SPM job manger
         
         % Loop for all subjects
-        for csub = subjects
+        for csub = 1:length(subjects)
             
             switch subjListFlag
                 case 'Only Unprocessed'
-                    if exist([processDir filesep csub{:} filesep...
+                    if exist([processDir filesep subjects{csub} filesep...
                             'func/ashburnerReferenceImage.nii.gz'],'file')==2
                         continue;
                     end
             end
             
             % Copy data from raw BIDS dir
-            setenv('subject',csub{1,1});
+            setenv('subject',subjects{csub});
             
             % Copy & unzip T1
             !mkdir -p $processDir/$subject/anat
@@ -192,7 +192,7 @@ switch preprocPipeline
             end
             
             % Create the path to this subjects' functional folder
-            subjFunc = fullfile(directories.func, csub{:}, 'func');
+            subjFunc = fullfile(directories.func, subjects{csub}, 'func');
             
             % Select run folders
             runs = cellstr(spm_select('FPList', subjFunc, 'dir', wildcard.run));
@@ -232,8 +232,8 @@ switch preprocPipeline
                     case 2
                         % Run Independent Slicetiming Parameters
                         for a=1:length(runs)
-                            images.reslice{1,a} = strrep(images.raw{1,a},[csub{:} '_task'],...
-                                ['r' csub{:} '_task']);
+                            images.reslice{1,a} = strrep(images.raw{1,a},[subjects{csub} '_task'],...
+                                ['r' subjects{csub} '_task']);
                         end
                         
                         matlabbatch{i}.spm.temporal.st.scans = images.reslice;
@@ -263,15 +263,15 @@ switch preprocPipeline
                     case 4
                         % Run Independent Coregistration Parameters
                         % Ashburner
-                        anatDir = fullfile(directories.anat, csub{:}, 'anat');
+                        anatDir = fullfile(directories.anat, subjects{csub}, 'anat');
                         matlabbatch{i}.spm.spatial.coreg.estimate.ref = {spm_select('ExtFPListRec', anatDir, wildcard.anat)};
                         matlabbatch{i}.spm.spatial.coreg.estimate.source = {[processDir ...
-                            filesep csub{:} filesep 'func' filesep ...
+                            filesep subjects{csub} filesep 'func' filesep ...
                             matlabbatch{i-1}.spm.util.imcalc.output '.nii']};
                         
                         for a=1:length(runs)
-                            images.slicetime{a,1} = [runs{a} '/ar' csub{:} ...
-                                '_task-' analysisName '_run-' num2str(a) '_bold.nii'];
+                            images.slicetime{a,1} = [runs{a} '/ar' subjects{csub} ...
+                                '_task-' taskName '_run-' num2str(a) '_bold.nii'];
                         end
                         
                         matlabbatch{i}.spm.spatial.coreg.estimate.other = images.slicetime;
@@ -326,13 +326,13 @@ switch preprocPipeline
                             for j=1:length(images.raw{a})
                                 images.norm{count,1}=images.reslice{a}{j};
                                 images.norm{count,1}=strrep(images.norm{count,1},...
-                                    ['r' csub{:} '_task'],['ar' csub{:} '_task']);
+                                    ['r' subjects{csub} '_task'],['ar' subjects{csub} '_task']);
                                 count=count+1;
                             end
                         end
                         
                         images.norm{count,1} = matlabbatch{i-2}.spm.spatial.coreg.estimate.ref{1};
-                        matlabbatch{i}.spm.spatial.normalise.estwrite.subj.vol = {[anatDir '/' csub{:} '_T1w.nii']};
+                        matlabbatch{i}.spm.spatial.normalise.estwrite.subj.vol = {[anatDir '/' subjects{csub} '_T1w.nii']};
                         matlabbatch{i}.spm.spatial.normalise.estwrite.subj.resample = images.norm;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
@@ -353,7 +353,7 @@ switch preprocPipeline
                         %Run Independent Smoothing Parameters
                         for a=1:(count-1)
                             images.smooth{a,1}=strrep(images.norm{a,1},...
-                                ['ar' csub{:} '_task'],['war' csub{:} '_task']);
+                                ['ar' subjects{csub} '_task'],['war' subjects{csub} '_task']);
                         end
                         
                         matlabbatch{i}.spm.spatial.smooth.data = images.smooth;
@@ -378,12 +378,12 @@ switch preprocPipeline
             
             %% Copy Motion Data to multivariate folder
             % Make output folder
-            setenv('outputDir',[studyPath filesep csub{:}]);
+            setenv('outputDir',[directory.Model filesep subjects{csub}]);
             !mkdir -p $outputDir
             
             for j=1:dataInfo.Runs
                 copyMotion = ['cp -p $processDir/$subject/func/run' num2str(j)...
-                    '/rp* $outputDir/$subject"_task-' analysisName '_run_'...
+                    '/rp* $outputDir/$subject"_task-' taskName '_run_'...
                     num2str(j) '_motionRegressors.txt"'];
                 system(copyMotion);
             end
@@ -394,7 +394,7 @@ switch preprocPipeline
                 temp = date;
                 newDate = [temp(end-3:end) temp(4:6) temp(1:2)];
                 movefile([directories.psfiles '/spm_' newDate '.ps'],...
-                    sprintf('%s.ps',[directories.psfiles '/' csub{:}]));
+                    sprintf('%s.ps',[directories.psfiles '/' subjects{csub}]));
             catch
                 % Catch for if processing ends on different day
                 % (e.g. changes in date from start to end)
@@ -406,7 +406,7 @@ switch preprocPipeline
                     newDate = [temp(end-3:end) temp(4:6) num2str(newDay)];
                 end
                 movefile([directories.psfiles '/spm_' newDate '.ps'],...
-                    sprintf('%s.ps',[directories.psfiles '/' csub{:}]));
+                    sprintf('%s.ps',[directories.psfiles '/' subjects{csub}]));
                 continue;
             end
             
@@ -442,7 +442,7 @@ switch preprocPipeline
                 % Convert Rotation millimeters to Radians to fit SMP12
                 for k=4:6
                     
-                    temp = T{:,k}./50; %Convert to mm by multiplying radians by 50mm radius - see Power framewise displacement paper
+                    temp = T{:,k}./50; %Convert radians to mm by dividing mm by 50mm radius - see Power framewise displacement paper
                     T{:,k} = temp;
                     
                     clear temp;
