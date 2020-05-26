@@ -95,6 +95,7 @@ for iteration=1:length(subjects)
     
     %Debug
     masks=masks(1:3);
+    bootstrap.perm = 100;
     
     for curMask = 1:length(masks)
         
@@ -383,13 +384,13 @@ for iteration=1:length(subjects)
                         
                         if iteration==1
                             try
-                                permFiles=dir([parentDir '/*permutation*.mat']);
+                                permFiles=dir([fileparts(parentDir) '/*permutation*.mat']);
                                 for i = 1:length(permFiles)
                                     dates(i) = datenum(permFiles(i).date);
                                 end
                                 
                                 [tmp,i] = max(dates);
-                                load([parentDir filesep permFiles(i).name]);
+                                load([fileparts(parentDir) filesep permFiles(i).name]);
                                 
                             catch
                                 
@@ -411,6 +412,16 @@ for iteration=1:length(subjects)
                         for i=1:bootstrap.perm
                             
                             currPermute = permutation(i);
+                            
+                            % Unequal Trial Check
+                            for j=1:taskInfo.Runs
+                                if length(partitions.test_indices{j}) ~= length(permutation(i).(['perm' num2str(j)]))
+                                    [~,I] = max(permutation(i).(['perm' num2str(j)]));
+                                    permutation(i).(['perm' num2str(j)])(I)=[];
+                                    [~,I] = max(permutation(i).(['perm' num2str(j)]));
+                                    permutation(i).(['perm' num2str(j)])(I)=[];
+                                end
+                            end
                             
                             try
                                 [predictions, accuracy] = ...
@@ -552,7 +563,8 @@ for iteration=1:length(subjects)
                         summary{row,header}=accuracy;
                         header=header+1;
                     case 'Yes'
-                        save([outputPath filesep ROI '_permutedAcc.mat'],'finalAcc');
+                        save([outputPath filesep regionName...
+                            '_permutedAcc.mat'],'finalAcc');
                         summary{row,header}=accuracy;
                         summary{row,header+1}=num2str(skewness(finalAcc));
                         summary{row,header+2}=num2str(kurtosis(finalAcc));
@@ -589,7 +601,7 @@ for iteration=1:length(subjects)
                 end
             end
         catch
-            error(['Unable to record classifier accuracy for ' subject '!']);
+            error(['Unable to record classifier accuracy for ' subjects{iteration} '!']);
         end
         
     end
