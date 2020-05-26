@@ -37,59 +37,41 @@ addpath(genpath('/path/to/CoSMoToolbox'));
 addpath(fileparts(which('cosmo_crossvalidate_bootstrap.m')));
 
 % turn cosmo warnings off
-%cosmo_warning('off');
+cosmo_warning('off');
 
 %% Set Analysis Parameters & Paths
 % Load subject IDs, ROIs, and Condition flags
-if exist('flag','var')==0
+if exist('flag','var') == 0
     
     %Select parameter file is flag does not exist
-    uiopen('*.mat')
+    [file,path]=uigetfile('*.mat','Select params file');
+    filename=fullfile(path,file);
+    load(filename);
     
 end
 
 % Filepath for results folder
-parentDir = fileparts(studyPath);
+parentDir = directory.Model;
 
 % Base output directory name
-switch analysisType
-    case 'Searchlight'
-        analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-            analysisType,'_',trialAnalysis,'_',metric,'_',...
-            num2str(searchlightSize),'_',conds{1,1},'_',conds{1,2});
-    otherwise
-        if exist('subConds','var')
-            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',...
-                conds{1,2},'_',subConds{1,1},'_',subConds{1,2});
-        else
-            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',conds{1,2});
-        end
-end
-
-% Bootstrap flag
-switch bootstrap.flag
-    case 'Yes'
-        analysis = [analysis '_Bootstrap'];
-end
+analysis = [directory.Analysis filesep 'models' filesep file(1:end-4)];
 
 %% Main Body
-for iteration=1:length(subjects)*length(rois)
+for iteration=1:length(subjects)
     
     % Loop count for all subject/region combinations
-    if iteration==1
-        subjCount=1;
-        regionCount=1;
-    elseif mod(iteration,length(rois))==mod(1,length(rois))
-        subjCount=subjCount+1;
-        regionCount=1;
-    elseif mod(iteration,length(rois))>=0
-        regionCount=regionCount+1;
-    end
+    %     if iteration==1
+    %         subjCount=1;
+    %         regionCount=1;
+    %     elseif mod(iteration,length(rois))==mod(1,length(rois))
+    %         subjCount=subjCount+1;
+    %         regionCount=1;
+    %     elseif mod(iteration,length(rois))>=0
+    %         regionCount=regionCount+1;
+    %     end
     
-    subject = subjects{subjCount};
-    ROI     = rois{regionCount};
+    %     subject = subjects{subjCount};
+    %     ROI     = rois{regionCount};
     
     %% Subject-Specific Directories
     
@@ -98,9 +80,8 @@ for iteration=1:length(subjects)*length(rois)
     %  spmFile  = fullpath to this subject's SPM.mat file. Note: the
     %                 :beta appended to the end tells cosmo to pull the beta
     %                 information from the SPM.mat file.
-    dataPath   = fullfile(studyPath, subject);
-    outputPath = fullfile(analysis, subject);
-    %spmFile = [dataPath '/SPM.mat'];
+    dataPath   = fullfile(directory.Model, subjects{iteration});
+    outputPath = fullfile(analysis, subjects{iteration});
     spmFile = [dataPath '/SPM_gz.mat'];
     
     % create the output path if it doesn't already exist
@@ -108,633 +89,521 @@ for iteration=1:length(subjects)*length(rois)
         mkdir(outputPath)
     end
     
-    % Path to current region mask
-    curROI = fullfile(roiPath, ROI);
+    %% Load Mask Data
+    masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
+        filesep subjects{iteration} filesep '*.nii.gz']);
     
-    % Current region name
-    regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
+    %Debug
+    masks=masks(1:3);
     
-    %%% Loading ROI data into CosmoMVPA - use SPM betas
-    % Note that loading data through the SPM.mat file will automatically
-    % "chunk" by runs, which is what we want
-    fprintf('Loading data from ROI: %s\n',ROI);
-    currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
-    
-    %%% Tidy up the dataset
-    % Remove constant features
-    currDataset=cosmo_remove_useless_data(currDataset);
-    
-    switch regressRT.flag
-        case 'Yes'
-            files = dir([studyPath filesep subject filesep 'Run*']);
-            for i=1:length(files)
-                curMat(i) = load([files(i).folder filesep files(i).name]);
-                if i==length(files)
-                    rtCell = [curMat.RT];
-                    
-                    % Convert from cell to double for regression
-                    for ii=1:length(rtCell)
+    for curMask = 1:length(masks)
+        
+        % Path to current region mask
+        curROI = fullfile(masks(curMask).folder, masks(curMask).name);
+        
+        % Current region name
+        regionName=erase(masks(curMask).name,'.nii.gz');
+        
+        %%% Loading ROI data into CosmoMVPA - use SPM betas
+        % Note that loading data through the SPM.mat file will automatically
+        % "chunk" by runs, which is what we want
+        fprintf('Loading data from ROI: %s\n',masks(curMask).name);
+        currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
+        
+        % Clear errant Not a Number (NaN) values
+        % Remove constant features
+        currDataset=cosmo_remove_useless_data(currDataset);
+        
+        switch regressRT.flag
+            case 'Yes'
+                files = dir([studyPath filesep subject filesep 'Run*']);
+                for i=1:length(files)
+                    curMat(i) = load([files(i).folder filesep files(i).name]);
+                    if i==length(files)
+                        rtCell = [curMat.RT];
                         
-                        % Flag outlier RT greater than 4 seconds
-                        if double(rtCell{ii}) >= regressRT.trialSec
-                            rtDouble(ii,1) = regressRT.trialSec;
-                        else
-                            rtDouble(ii,1) = double(rtCell{ii});
+                        % Convert from cell to double for regression
+                        for ii=1:length(rtCell)
+                            
+                            % Flag outlier RT greater than 4 seconds
+                            if double(rtCell{ii}) >= regressRT.trialSec
+                                rtDouble(ii,1) = regressRT.trialSec;
+                            else
+                                rtDouble(ii,1) = double(rtCell{ii});
+                            end
                         end
+                        
+                        % Replace with trial duration (set in params)
+                        rtDouble(isnan(rtDouble))=regressRT.trialSec;
+                    end
+                end
+                
+                for i=1:length(currDataset.samples)
+                    model = LinearModel.fit(rtDouble,currDataset.samples(:,i));
+                    if i==1
+                        allResiduals = model.Residuals.Raw;
+                    else
+                        allResiduals = [allResiduals model.Residuals.Raw];
+                    end
+                end
+                
+                zscoreResid = zscore(allResiduals);
+                currDataset.samples = zscoreResid;
+                
+                clear files curMat rtCell rtDouble model allResiduals zscoreResid;
+        end
+        
+        %%% Test/Train Flag %%%
+        % If set to 'Trial', chunks will be reset by trial instead of by run.
+        % Each trials is now its own separate chunk
+        %
+        % This has been removed from the parameters but can be included by
+        % uncommenting this code and resetting the 'trialAnalysis'
+        % variable to 'Trial'.
+        %         switch trialAnalysis
+        %             case 'Run'
+%         switch trialAnalysis
+%             case 'Trial'
+%                 currDataset.sa.chunks=(1:1:length(currDataset.sa.chunks))';
+%         end
+        
+        % Identify trials of interest for each condition
+        if exist('subConds','var')
+            
+            for ii=1:length(taskInfo.Conditions)
+                
+                subCond.(taskInfo.Conditions{1,ii})=contains(currDataset.sa.labels, taskInfo.Conditions{1,ii});
+                counter=1;
+                
+                for iii=1:length(subConds)
+                    subCond.(taskInfo.Conditions{1,ii})(:,counter+1)=contains...
+                        (currDataset.sa.labels, subConds{1,iii});
+                    counter=counter+1;
+                end
+                
+                subCond.(taskInfo.Conditions{1,ii})=double(subCond.(taskInfo.Conditions{1,ii}));
+                subCond.(taskInfo.Conditions{1,ii})(:,counter+1)=sum(subCond.(taskInfo.Conditions{1,ii})(:,1:counter),2);
+                
+            end
+            
+            Cond(1).idx = find(subCond.(taskInfo.Conditions{1,1})(:,counter+1) == counter);
+            Cond(2).idx = find(subCond.(taskInfo.Conditions{1,2})(:,counter+1) == counter);
+            
+        else
+            
+            CondList = zeros(size(currDataset.samples,1),1);
+            for ii=1:length(taskInfo.Conditions)
+                Cond(ii).labels = ~cellfun(@isempty, strfind...
+                    (currDataset.sa.labels, taskInfo.Conditions{ii}));
+                Cond(ii).idx = find(Cond(ii).labels == 1);
+                
+                CondList(Cond(ii).idx) = ii;
+                
+            end
+            
+        end
+        
+        currDataset.sa.targets = CondList;
+        
+        % Codes trials/conditions of no interest as 0 (see SpecifyModel script
+        % for trial tag information)
+        Zeroidx = find(CondList == 0);
+        
+        % Removes all trials of no interest from analysis
+        if isempty(Zeroidx)==0
+            currDataset.samples(Zeroidx,:)=[];
+            currDataset.sa.targets(Zeroidx)=[];
+            currDataset.sa.beta_index(Zeroidx)=[];
+            currDataset.sa.chunks(Zeroidx)=[];
+            currDataset.sa.fname(Zeroidx)=[];
+            currDataset.sa.labels(Zeroidx)=[];
+        end
+        
+        fprintf('Number of possible targets: %i\n',length...
+            (unique(currDataset.sa.targets)));
+        
+        % Print dataset
+        fprintf('Dataset input:\n');
+        fprintf('Number of samples: %i\n',size(currDataset.samples,1));
+        fprintf('Number of features (voxels): %i\n',size(currDataset.samples,2));
+        fprintf('Number of chunks (runs): %i\n',length(unique(currDataset.sa.chunks)));
+        
+        %% classifier ROI analysis
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % Define which classifier to use, using a function handle.
+        % Alternatives are @cosmo_classify_{svm,matlabsvm,libsvm,nn,naive_bayes}
+        
+        % Set partition scheme. odd_even is fast; for publication-quality analysis
+        % nfold_partitioner (cross-validation) is recommended.
+        % Alternatives are:
+        % - cosmo_nfold_partitioner    (take-one-chunk-out crossvalidation)
+        % - cosmo_nchoosek_partitioner (take-K-chunks-out  "             ").
+        % We will also make sure the partitions are *balanced* (targets are evenly
+        % distributed).
+        partitions = cosmo_nfold_partitioner(currDataset);
+        
+        %%% Test/Train Flag
+        % If set to 'Trial', partitions will not be balanced. Balancing is not
+        % possible for 'Trial' as n-1 trials are used to train and tested on
+        % the remaining trial (e.g. 100 Trials = train on 99, test on 1)
+        %
+        % This has been removed from the parameters but can be included by
+        % uncommenting this code and resetting the 'trialAnalysis'
+        % variable to anything.
+        %         switch trialAnalysis
+        %             case 'Run'
+        partitions = cosmo_balance_partitions(partitions, currDataset);
+        %         end
+        
+        fprintf('There are %d partitions\n', numel(partitions.train_indices));
+        fprintf('# train samples:%s\n', sprintf(' %d', cellfun(@numel, ...
+            partitions.train_indices)));
+        fprintf('# test samples:%s\n', sprintf(' %d', cellfun(@numel, ...
+            partitions.test_indices)));
+        
+        % Set any other options - see help cosmo_crossvalidate
+        opt = struct();
+        
+        switch analysisType
+            case 'Searchlight'
+                % This analysis identifies brain regions that discriminate the categories
+                % using a whole-brain searchlight procedure. The classifier uses an n-fold
+                % partitioning scheme (cross-validation) and a Linear Discriminant Analysis
+                % (LDA) classifier.
+                
+                % Use the cosmo_cross_validation_measure and set its parameters
+                % (classifier and partitions) in a measure_args struct.
+                measure = @cosmo_crossvalidation_measure;
+                
+                % Defines which classifier to use, using a function handle.
+                classifier.function = @cosmo_classify_lda;
+                classifier.name = 'LDA';
+                opt.classifier = classifier.function;
+                
+                % Set partition scheme.
+                opt.partitions = partitions;
+                
+                try
+                    % Define a neighborhood with approximately 100 voxels in
+                    % each searchlight.
+                    nbrhood=cosmo_spherical_neighborhood(currDataset,metric,...
+                        searchlightSize);
+                    
+                    %%% Test/Train Flag
+                    % If set to 'Trial', partitions are not checked for balance
+                    % because they cannot be. Code will crash/not classify if
+                    % balancing is not set to be ignored.
+                    switch trialAnalysis
+                        case 'Trial'
+                            opt.check_partitions=false;
                     end
                     
-                    % Replace with trial duration (set in params)
-                    rtDouble(isnan(rtDouble))=regressRT.trialSec;
+                    % Run the searchlight
+                    searchResults = cosmo_searchlight...
+                        (currDataset,nbrhood,measure,opt);
+                    save([outputPath '/searchlightResults_' regionName '_' metric '_' ...
+                        num2str(searchlightSize) '.mat'],'searchResults');
+                    
+                    % print output dataset
+                    fprintf('Dataset output:\n');
+                    
+                    % Define output location
+                    if ~exist('subConds','var')
+                        output=strcat(outputPath,'/',subject,'_',...
+                            classifier.name,'_Searchlight_',regionName,'_',...
+                            metric,'_',num2str(searchlightSize),'_',...
+                            taskInfo.Conditions{1},'_vs_',taskInfo.Conditions{2},'.nii');
+                    else
+                        output=strcat(outputPath,'/',subject,'_',...
+                            classifier.name,'_Searchlight_',regionName,'_',...
+                            metric,'_',num2str(searchlightSize),'_',...
+                            taskInfo.Conditions{1},'_vs_',taskInfo.Conditions{2},'_',subConds{1,1},'.nii');
+                    end
+                    
+                    % Store results to disc
+                    cosmo_map2fmri(searchResults, output);
+                    
+                    % Gunzip output to save space
+                    setenv('output',output);
+                    !gzip $output
+                catch ME
+                    disp([ME.message ' Unable to create searchlight for ' ...
+                        regionName '!']);
                 end
-            end
-            
-            for i=1:length(currDataset.samples)
-                model = LinearModel.fit(rtDouble,currDataset.samples(:,i));
-                if i==1
-                    allResiduals = model.Residuals.Raw;
-                else
-                    allResiduals = [allResiduals model.Residuals.Raw];
-                end
-            end
-            
-            zscoreResid = zscore(allResiduals);
-            currDataset.samples = zscoreResid;
-            
-            clear files curMat rtCell rtDouble model allResiduals zscoreResid;
-    end
-    
-    %%% Test/Train Flag
-    % If set to 'Trial', chunks will be reset by trial instead of by run.
-    % Each trials is now its own separate chunk
-    switch trialAnalysis
-        case 'Trial'
-            currDataset.sa.chunks=(1:1:length(currDataset.sa.chunks))';
-    end
-    
-    %%% Indentify trials of interest for each condition
-    if exist('subConds','var')
-        
-        for ii=1:length(conds)
-            
-            subCond.(conds{1,ii})=contains(currDataset.sa.labels, conds{1,ii});
-            counter=1;
-            
-            for iii=1:length(subConds)
-                subCond.(conds{1,ii})(:,counter+1)=contains...
-                    (currDataset.sa.labels, subConds{1,iii});
-                counter=counter+1;
-            end
-            
-            subCond.(conds{1,ii})=double(subCond.(conds{1,ii}));
-            subCond.(conds{1,ii})(:,counter+1)=sum(subCond.(conds{1,ii})(:,1:counter),2);
-            
-        end
-        
-        Cond(1).idx = find(subCond.(conds{1,1})(:,counter+1) == counter);
-        Cond(2).idx = find(subCond.(conds{1,2})(:,counter+1) == counter);
-        
-    else
-        
-        CondList = zeros(size(currDataset.samples,1),1);
-        for ii=1:length(conds)
-            Cond(ii).labels = ~cellfun(@isempty, strfind...
-                (currDataset.sa.labels, conds{ii}));
-            Cond(ii).idx = find(Cond(ii).labels == 1);
-            
-            CondList(Cond(ii).idx) = ii;
-            
-        end
-        
-    end
-    
-    currDataset.sa.targets = CondList;
-    
-    % Codes trials/conditions of no interest as 0 (see SpecifyModel script
-    % for trial tag information)
-    Zeroidx = find(CondList == 0);
-    
-    % Removes all trials of no interest from analysis
-    if isempty(Zeroidx)==0
-        currDataset.samples(Zeroidx,:)=[];
-        currDataset.sa.targets(Zeroidx)=[];
-        currDataset.sa.beta_index(Zeroidx)=[];
-        currDataset.sa.chunks(Zeroidx)=[];
-        currDataset.sa.fname(Zeroidx)=[];
-        currDataset.sa.labels(Zeroidx)=[];
-    end
-    
-    fprintf('Number of possible targets: %i\n',length...
-        (unique(currDataset.sa.targets)));
-    
-    % Print dataset
-    fprintf('Dataset input:\n');
-    fprintf('Number of samples: %i\n',size(currDataset.samples,1));
-    fprintf('Number of features (voxels): %i\n',size(currDataset.samples,2));
-    fprintf('Number of chunks (runs): %i\n',length(unique(currDataset.sa.chunks)));
-    
-    %% classifier ROI analysis
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Define which classifier to use, using a function handle.
-    % Alternatives are @cosmo_classify_{svm,matlabsvm,libsvm,nn,naive_bayes}
-    
-    % Set partition scheme. odd_even is fast; for publication-quality analysis
-    % nfold_partitioner (cross-validation) is recommended.
-    % Alternatives are:
-    % - cosmo_nfold_partitioner    (take-one-chunk-out crossvalidation)
-    % - cosmo_nchoosek_partitioner (take-K-chunks-out  "             ").
-    % We will also make sure the partitions are *balanced* (targets are evenly
-    % distributed).
-    partitions = cosmo_nfold_partitioner(currDataset);
-    
-    %%% Test/Train Flag
-    % If set to 'Trial', partitions will not be balanced. Balancing is not
-    % possible for 'Trial' as n-1 trials are used to train and tested on
-    % the remaining trial (e.g. 100 Trials = train on 99, test on 1)
-    switch trialAnalysis
-        case 'Run'
-            partitions = cosmo_balance_partitions(partitions, currDataset);
-    end
-    
-    fprintf('There are %d partitions\n', numel(partitions.train_indices));
-    fprintf('# train samples:%s\n', sprintf(' %d', cellfun(@numel, ...
-        partitions.train_indices)));
-    fprintf('# test samples:%s\n', sprintf(' %d', cellfun(@numel, ...
-        partitions.test_indices)));
-    
-    % Set any other options - see help cosmo_crossvalidate
-    opt = struct();
-    
-    switch analysisType
-        case 'Searchlight'
-            % This analysis identifies brain regions that discriminate the categories
-            % using a whole-brain searchlight procedure. The classifier uses an n-fold
-            % partitioning scheme (cross-validation) and a Linear Discriminant Analysis
-            % (LDA) classifier.
-            
-            % Use the cosmo_cross_validation_measure and set its parameters
-            % (classifier and partitions) in a measure_args struct.
-            measure = @cosmo_crossvalidation_measure;
-            
-            % Defines which classifier to use, using a function handle.
-            classifier.function = @cosmo_classify_lda;
-            classifier.name = 'LDA';
-            opt.classifier = classifier.function;
-            
-            % Set partition scheme.
-            opt.partitions = partitions;
-            
-            try
-                % Define a neighborhood with approximately 100 voxels in 
-                % each searchlight.
-                nbrhood=cosmo_spherical_neighborhood(currDataset,metric,...
-                    searchlightSize);
+                
+            otherwise
+                % This analysis calculates classification accuracy using all
+                % voxels within the ROI. The classifier uses an n-fold
+                % partitioning scheme (cross-validation) and a
+                % Support Vector Machine (SVM) classifier.
+                
+                % Defines which classifier to use, using a function handle.
+                classifier.function = @cosmo_classify_svm;
+                classifier.name = 'SVM';
+                
+                % Set any other options - see help cosmo_crossvalidate
+                opt.normalization = 'zscore';
+                opt.max_feature_count = size(currDataset.samples,2);
                 
                 %%% Test/Train Flag
                 % If set to 'Trial', partitions are not checked for balance
                 % because they cannot be. Code will crash/not classify if
                 % balancing is not set to be ignored.
-                switch trialAnalysis
-                    case 'Trial'
+                %
+                % This has been removed from the parameters but can be 
+                % included by uncommenting this code and resetting the 
+                % 'trialAnalysis' variable to 'Trial.
+%                 switch trialAnalysis
+%                     case 'Trial'
+%                         opt.check_partitions=false;
+%                 end
+                
+                %Bootstrapping
+                switch bootstrap.flag
+                    case 'Yes'
                         opt.check_partitions=false;
-                end
-                
-                % Run the searchlight
-                searchResults = cosmo_searchlight...
-                    (currDataset,nbrhood,measure,opt);
-                save([outputPath '/searchlightResults_' regionName '_' metric '_' ...
-                    num2str(searchlightSize) '.mat'],'searchResults');
-                
-                % print output dataset
-                fprintf('Dataset output:\n');
-                
-                % Define output location
-                if ~exist('subConds','var')
-                    output=strcat(outputPath,'/',subject,'_',...
-                        classifier.name,'_Searchlight_',regionName,'_',...
-                        metric,'_',num2str(searchlightSize),'_',...
-                        conds{1,1},'_vs_',conds{1,2},'.nii');
-                else
-                    output=strcat(outputPath,'/',subject,'_',...
-                        classifier.name,'_Searchlight_',regionName,'_',...
-                        metric,'_',num2str(searchlightSize),'_',...
-                        conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
-                end
-                
-                % Store results to disc
-                cosmo_map2fmri(searchResults, output);
-                
-                % Gunzip output to save space
-                setenv('output',output);
-                !gzip $output
-            catch ME
-                disp([ME.message ' Unable to create searchlight for ' ...
-                    regionName '!']);
-            end
-            
-        otherwise
-            % This analysis calculates classification accuracy using all
-            % voxels within the ROI. The classifier uses an n-fold
-            % partitioning scheme (cross-validation) and a
-            % Support Vector Machine (SVM) classifier.
-            
-            % Defines which classifier to use, using a function handle.
-            classifier.function = @cosmo_classify_svm;
-            classifier.name = 'SVM';
-            
-            % Set any other options - see help cosmo_crossvalidate
-            opt.normalization = 'zscore';
-            opt.max_feature_count = size(currDataset.samples,2);
-            
-            %%% Test/Train Flag
-            % If set to 'Trial', partitions are not checked for balance
-            % because they cannot be. Code will crash/not classify if
-            % balancing is not set to be ignored.
-            switch trialAnalysis
-                case 'Trial'
-                    opt.check_partitions=false;
-            end
-            
-            %Bootstrapping
-            switch bootstrap.flag
-                case 'Yes'
-                    opt.check_partitions=false;
-                    
-                    for i=1:bootstrap.numRuns
                         
-                        runTrials=find(currDataset.sa.chunks==i);
-                        
-                        if i==1
-                            diff = length(runTrials)-...
-                                length(partitions.test_indices{i});
-                            counter=0;
-                        end
-                        
-                        if ~isempty(runTrials)
-                            block(i).begin = min(runTrials)-counter;
-                            counter=counter+diff;
-                            block(i).end = max(runTrials)-counter;
-                        end
-                        
-                    end
-                    
-                    if iteration==1
-                        try
-                            permFiles=dir([parentDir '/*permutation*.mat']);
-                            for i = 1:length(permFiles)
-                                dates(i) = datenum(permFiles(i).date);
+                        for i=1:bootstrap.numRuns
+                            
+                            runTrials=find(currDataset.sa.chunks==i);
+                            
+                            if i==1
+                                diff = length(runTrials)-...
+                                    length(partitions.test_indices{i});
+                                counter=0;
                             end
                             
-                            [tmp,i] = max(dates);
-                            load([parentDir filesep permFiles(i).name]);
+                            if ~isempty(runTrials)
+                                block(i).begin = min(runTrials)-counter;
+                                counter=counter+diff;
+                                block(i).end = max(runTrials)-counter;
+                            end
                             
-                        catch
-                            
-                            for i=1:bootstrap.perm
-                                for j=1:length(block)
-                                    permutation(i).(...
-                                        bootstrap.structNames{j}) = ...
-                                        randperm(length(bootstrap.trialsPerRun));
+                        end
+                        
+                        if iteration==1
+                            try
+                                permFiles=dir([parentDir '/*permutation*.mat']);
+                                for i = 1:length(permFiles)
+                                    dates(i) = datenum(permFiles(i).date);
                                 end
+                                
+                                [tmp,i] = max(dates);
+                                load([parentDir filesep permFiles(i).name]);
+                                
+                            catch
+                                
+                                for i=1:bootstrap.perm
+                                    for j=1:length(block)
+                                        permutation(i).(...
+                                            bootstrap.structNames{j}) = ...
+                                            randperm(length(bootstrap.trialsPerRun));
+                                    end
+                                end
+                                
+                                %Save Date/Time in filename
+                                timePermute = datestr(now,'yyyymmddHHMMSS');
+                                save([analysis '_' classType '_permutation_'...
+                                    timePermute '.mat'],'permutation');
                             end
+                        end
+                        
+                        for i=1:bootstrap.perm
                             
-                            %Save Date/Time in filename
-                            timePermute = datestr(now,'yyyymmddHHMMSS');
-                            save([out_path '_' classType '_permutation_'...
-                                timePermute '.mat'],'permutation');
+                            currPermute = permutation(i);
+                            
+                            try
+                                [predictions, accuracy] = ...
+                                    cosmo_crossvalidate_bootstrap...
+                                    (currDataset,classifier.function,...
+                                    partitions,opt,bootstrap.structNames,...
+                                    currPermute,block);
+                            catch
+                                accuracy = NaN;
+                            end
+                            finalPred.(regionName)(:,i)=predictions;
+                            finalAcc(i,1)=accuracy;
+                            
                         end
-                    end
-                    
-                    for i=1:bootstrap.perm
+                        concatAccuracy(:,curMask) = finalAcc;
                         
-                        if i==1
-                            regionName=erase(ROI,{'reslice_','_bilat.nii'});
-                        end
-                        currPermute = permutation(i);
-                        
-                        try
-                            [predictions, accuracy] = ...
-                                cosmo_crossvalidate_bootstrap...
-                                (currDataset,classifier.function,...
-                                partitions,opt,bootstrap.structNames,...
-                                currPermute,block);
-                        catch
-                            accuracy = NaN;
-                        end
-                        finalPred.(regionName)(:,i)=predictions;
-                        finalAcc(i,1)=accuracy;
-                        
-                    end
-                    concatAccuracy(:,regionCount) = finalAcc;
-                    
-                    % Run Standard SVM classification with no bootstrap
-            end
-            
-            %regionName=erase(ROI,{'reslice_','_bilat.nii','-'});
-            try
-                [predictions,accuracy] = cosmo_crossvalidate...
-                    (currDataset,classifier.function,partitions,opt);
-                % Report results in command window
-                fprintf('Accuracy: %0.2f\n',accuracy);
-            catch
-                fprintf('Classification Failed!\n');
-                predictions(1:length(currDataset.sa.chunks),1) = NaN;
-                accuracy = NaN;
-            end
-            
-            finalPredictions(:,regionCount) = predictions;
-            clear predictions;
-    end
-    
-    %% Calculating Classification Accuracy
-    if strcmpi(analysisType,'Searchlight')==0
-        
-        % Caluclate accuracy by individual trial
-        switch bootstrap.flag
-            case 'Yes'
-                for j=1:size(finalPred.(regionName),2)
-                    for k=1:size(finalPred.(regionName),1)
-                        if isnan(finalPred.(regionName)(k,j))==1
-                            correct.(regionName)(k,j)=NaN;
-                        elseif finalPred.(regionName)(k,j)==currDataset.sa.targets(k)
-                            correct.(regionName)(k,j)=1;
-                        else
-                            correct.(regionName)(k,j)=0;
-                        end
-                    end
                 end
-            case 'No'
-                for j=1:length(finalPredictions(:,regionCount))
-                    if isnan(finalPredictions(j,regionCount))==1
-                        correct.(regionName)(j,1)=NaN;
-                    elseif finalPredictions(j,regionCount)==currDataset.sa.targets(j)
-                        correct.(regionName)(j,1)=1;
-                    else
-                        correct.(regionName)(j,1)=0;
-                    end
+                
+                % Run Standard SVM classification with no bootstrap
+                try
+                    [predictions,accuracy] = cosmo_crossvalidate...
+                        (currDataset,classifier.function,partitions,opt);
+                    % Report results in command window
+                    fprintf('Accuracy: %0.2f\n',accuracy);
+                catch
+                    fprintf('Classification Failed!\n');
+                    predictions(1:length(currDataset.sa.chunks),1) = NaN;
+                    accuracy = NaN;
                 end
+                
+                finalPredictions(:,curMask) = predictions;
+                clear predictions;
         end
         
-        % Calculate accuracy by behavioral trial type (e.g., Hit acc, Miss acc)
-        
-        % Pull trial information from ROI by target condition
-        Cond1 = ~cellfun(@isempty, strfind(currDataset.sa.labels, conds{1,1}));
-        Cond1idx = find(Cond1 == 1);
-        Cond2 = ~cellfun(@isempty, strfind(currDataset.sa.labels, conds{1,2}));
-        Cond2idx = find(Cond2 == 1);
-        trialInfo.Cond1 = currDataset.sa.labels(Cond1idx);
-        trialInfo.Cond2 = currDataset.sa.labels(Cond2idx);
-        
-        switch bootstrap.flag
-            case 'No'
-                
-                % Pull accuracy information by target condition
-                acc.Cond1 = correct.(regionName)(Cond1idx');
-                acc.Cond2 = correct.(regionName)(Cond2idx');
-                acc.Cond1 = acc.Cond1';
-                acc.Cond2 = acc.Cond2';
-                
-                % Find behavioral trials for each condition
-                acc.rec1 = ~cellfun(@isempty, strfind(trialInfo.Cond1,'Hit'));
-                acc.fam1 = ~cellfun(@isempty, strfind(trialInfo.Cond1,'Familiar'));
-                acc.miss1 = ~cellfun(@isempty, strfind(trialInfo.Cond1,'Miss'));
-                
-                acc.rec2 = ~cellfun(@isempty, strfind(trialInfo.Cond2,'Hit'));
-                acc.fam2 = ~cellfun(@isempty, strfind(trialInfo.Cond2,'Familiar'));
-                acc.miss2 = ~cellfun(@isempty, strfind(trialInfo.Cond2,'Miss'));
-                
-                acc.recFinal1 = acc.Cond1(acc.rec1==1);
-                acc.famFinal1 = acc.Cond1(acc.fam1==1);
-                acc.missFinal1 = acc.Cond1(acc.miss1==1);
-                
-                acc.recFinal2 = acc.Cond2(acc.rec2==1);
-                acc.famFinal2 = acc.Cond2(acc.fam2==1);
-                acc.missFinal2 = acc.Cond2(acc.miss2==1);
-                
-                if iteration==1
-                    finalTableTrialTypeAcc=cell(length(subjects)+1,length(rois)+2);
-                    finalTableTrialTypeAcc{1,1}='subjectid';
-                    finalTableTrialTypeAcc{1,2}='Trial Type';
-                    tempcount=3;
-                    
-                    for headerTrialType=1:length(rois)
-                        finalTableTrialTypeAcc{1,tempcount}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedRecAccuracy');
-                        finalTableTrialTypeAcc{1,tempcount+1}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelRecAccuracy');
-                        
-                        finalTableTrialTypeAcc{1,tempcount+2}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedRecNumTrials');
-                        finalTableTrialTypeAcc{1,tempcount+3}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelRecNumTrials');
-                        
-                        finalTableTrialTypeAcc{1,tempcount+4}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedFamAccuracy');
-                        finalTableTrialTypeAcc{1,tempcount+5}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelFamAccuracy');
-                        
-                        finalTableTrialTypeAcc{1,tempcount+6}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedFamNumTrials');
-                        finalTableTrialTypeAcc{1,tempcount+7}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelFamNumTrials');
-                        
-                        finalTableTrialTypeAcc{1,tempcount+8}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedMissAccuracy');
-                        finalTableTrialTypeAcc{1,tempcount+9}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelMissAccuracy');
-                        
-                        finalTableTrialTypeAcc{1,tempcount+10}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_trainedMissNumTrials');
-                        finalTableTrialTypeAcc{1,tempcount+11}=strcat...
-                            (rois{1,headerTrialType}(1:end-4),'_novelMissNumTrials');
-                        
-                        tempcount=tempcount+12;
-                    end
-                    
-                    row=2;
-                    headerTrialType=3;
-                    clear tempcount;
-                    TrialTypeCombo = {strcat(conds{1,1},'_v_',conds{1,2})};
-                end
-                
-                % Add subject, trial type, and accuracy to table
-                finalTableTrialTypeAcc{row,1}=subject;
-                finalTableTrialTypeAcc{row,2}=TrialTypeCombo{1,1};
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.recFinal1));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.recFinal2));
-                headerTrialType=headerTrialType+1;
-                
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.recFinal1) - sum(isnan(acc.recFinal1)));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.recFinal2) - sum(isnan(acc.recFinal2)));
-                headerTrialType=headerTrialType+1;
-                
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.famFinal1));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.famFinal2));
-                headerTrialType=headerTrialType+1;
-                
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.famFinal1) - sum(isnan(acc.famFinal1)));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.famFinal2) - sum(isnan(acc.famFinal2)));
-                headerTrialType=headerTrialType+1;
-                
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.missFinal1));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (nanmean(acc.missFinal2));
-                headerTrialType=headerTrialType+1;
-                
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.missFinal1) - sum(isnan(acc.missFinal1)));
-                headerTrialType=headerTrialType+1;
-                finalTableTrialTypeAcc{row,headerTrialType}=num2str...
-                    (length(acc.missFinal2) - sum(isnan(acc.missFinal2)));
-                headerTrialType=headerTrialType+1;
-                
-        end
-        
-    end
-    
-    %% Save text output of SVM Classification
-    try
+        %% Calculating Classification Accuracy
         if strcmpi(analysisType,'Searchlight')==0
             
-            % Create a tidyverse formatted table for final statistical analysis
-            for i=1:length(conds)
-                if i==1
-                    TrialTypeCombo = conds{i};
-                else
-                    TrialTypeCombo = strcat(TrialTypeCombo,'_v_',conds{i});
-                end
-            end
-            
-            TrialTypeCombo = {TrialTypeCombo};
-            
-            % create subjectid and roiid columns
-            subjectid   = repmat({subject}, length(TrialTypeCombo), 1);
-            roiid       = repmat({regionName}, length(TrialTypeCombo), 1);
-            
-            % create the stats table
-            stats_table = table(subjectid, roiid, TrialTypeCombo, accuracy);
-            
-            % write the stats table
-            filename = sprintf('sub-%s_roi-%s_%s_statistics-table.csv',...
-                subject, regionName, classifier.name);
-            writetable(stats_table, fullfile(outputPath, filename));
-            
-            %% Create aggregate table of classification
-            % Create headers
-            if iteration==1
-                finalTable=cell(length(subjects)+1,length(rois)+2);
-                finalTable{1,1}='subjectid';
-                finalTable{1,2}='Trial Type';
-                tempcount=3;
-                switch bootstrap.flag
-                    case 'No'
-                        for header=1:length(rois)
-                            finalTable{1,tempcount}=strcat...
-                                (rois{1,header}(1:end-4),'_Accuracy');
-                            tempcount=tempcount+1;
-                        end
-                    case 'Yes'
-                        for header=1:length(rois)
-                            finalTable{1,tempcount}=strcat...
-                                (rois{1,header}(1:end-4),'_true_accuracy');
-                            finalTable{1,tempcount+1}=strcat...
-                                (rois{1,header}(1:end-4),'_perm_skew');
-                            finalTable{1,tempcount+2}=strcat...
-                                (rois{1,header}(1:end-4),'_perm_kurtosis');
-                            tempcount=tempcount+3;
-                        end
-                end
-                
-                finalTable{1,tempcount}='numTargets';
-                finalTable{1,tempcount+1}='numTrain';
-                
-                row=2;
-                header=3;
-                clear tempcount;
-            end
-            
-            % Counter for resetting to next row. Uses remainder from divison of
-            % region counter over total (e.g. 1/14) to check data should be
-            % read into next subject line/row.
-            iterCheck=mod(iteration,length(rois));
-            
-            % Add subject, trial type, and accuracy to table
-            finalTable{row,1}=subject;
-            finalTable{row,2}=TrialTypeCombo{1,1};
+            % Caluclate classifier accuracy by individual trial
             switch bootstrap.flag
-                case 'No'
-                    finalTable{row,header}=accuracy;
-                    header=header+1;
                 case 'Yes'
-                    save([outputPath filesep ROI '_permutedAcc.mat'],'finalAcc');
-                    finalTable{row,header}=accuracy;
-                    finalTable{row,header+1}=num2str(skewness(finalAcc));
-                    finalTable{row,header+2}=num2str(kurtosis(finalAcc));
-                    header=header+3;
-                    
-                    clear finalAcc;
+                    for j=1:size(finalPred.(regionName),2)
+                        for k=1:size(finalPred.(regionName),1)
+                            if isnan(finalPred.(regionName)(k,j))==1
+                                correct.(regionName)(k,j)=NaN;
+                            elseif finalPred.(regionName)(k,j)==currDataset.sa.targets(k)
+                                correct.(regionName)(k,j)=1;
+                            else
+                                correct.(regionName)(k,j)=0;
+                            end
+                        end
+                    end
+                case 'No'
+                    for j=1:length(finalPredictions(:,curMask))
+                        if isnan(finalPredictions(j,curMask))==1
+                            correct.(regionName)(j,1)=NaN;
+                        elseif finalPredictions(j,curMask)==currDataset.sa.targets(j)
+                            correct.(regionName)(j,1)=1;
+                        else
+                            correct.(regionName)(j,1)=0;
+                        end
+                    end
             end
             
-            % Drops to next row if remainder is 0 (e.g. all regions have been
-            % entered for a given subject)
-            if iterCheck == 0
-                finalTable{row,header}=num2str(...
-                    length(partitions.test_indices{1,1}));
-                finalTable{row,header+1}=num2str(...
-                    length(partitions.train_indices{1,1}));
-                row=row+1;
-                header=3;
-                headerTrialType=3;
+        end
+        
+        %% Save text output of SVM Classification
+        try
+            if strcmpi(analysisType,'Searchlight')==0
                 
+                % Create a tidyverse formatted table for final statistical analysis
+                for i=1:length(taskInfo.Conditions)
+                    if i==1
+                        TrialTypeCombo = taskInfo.Conditions{i};
+                    else
+                        TrialTypeCombo = strcat(TrialTypeCombo,'_v_',taskInfo.Conditions{i});
+                    end
+                end
+                
+                TrialTypeCombo = {TrialTypeCombo};
+                
+                % create subjectid and roiid columns
+                subjectid   = repmat({subjects{iteration}}, ...
+                    length(TrialTypeCombo), 1);
+                roiid       = repmat({regionName}, ...
+                    length(TrialTypeCombo), 1);
+                
+                % create the stats table
+                stats_table = table(subjectid, roiid, TrialTypeCombo, accuracy);
+                
+                % write the stats table
+                filename = sprintf('sub-%s_roi-%s_%s_statistics-table.csv',...
+                    subjects{iteration}, regionName, classifier.name);
+                writetable(stats_table, fullfile(outputPath, filename));
+                
+                %% Create aggregate table of classification
+                % Create headers
+                if iteration==1 && curMask==1
+                    summary=cell(length(subjects)+1,length(masks)+2);
+                    summary{1,1}='subjectid';
+                    summary{1,2}='Trial Type';
+                    tmpCnt=3;
+                    switch bootstrap.flag
+                        case 'No'
+                            for header=1:length(masks)
+                                summary{1,tmpCnt}=[masks(header).name(1:end-7)...
+                                    '_classAcc'];
+                                tmpCnt=tmpCnt+1;
+                            end
+                        case 'Yes'
+                            for header=1:length(masks)
+                                summary{1,tmpCnt}=[masks(header).name(1:end-7)...
+                                    '_true_accuracy'];
+                                summary{1,tmpCnt+1}=[masks(header).name(1:end-7)...
+                                    '_perm_skew'];
+                                summary{1,tmpCnt+2}=[masks(header).name(1:end-7)...
+                                    '_perm_kurtosis'];
+                                tmpCnt=tmpCnt+3;
+                            end
+                    end
+                    
+                    summary{1,tmpCnt}='numTargets';
+                    summary{1,tmpCnt+1}='numTrain';
+                    
+                    row=2;
+                    header=3;
+                    clear tmpCnt;
+                end
+                
+                % Counter for resetting to next row. Uses remainder from divison of
+                % region counter over total (e.g. 1/14) to check data should be
+                % read into next subject line/row.
+                iterCheck=mod(curMask,length(masks));
+                
+                % Add subject, trial type, and accuracy to table
+                summary{row,1}=subjects{iteration};
+                summary{row,2}=TrialTypeCombo{1,1};
                 switch bootstrap.flag
                     case 'No'
-                        % Save mat file with predictions separately
-                        save([outputPath filesep 'finalPredictions.mat'],...
-                            'finalPredictions');
-                        save([outputPath filesep 'finalAccuracy.mat'],'correct');
-                        clear finalPredictions correct;
+                        summary{row,header}=accuracy;
+                        header=header+1;
                     case 'Yes'
-                        save([outputPath filesep 'allROIPermuteACC.mat'],...
-                            'concatAccuracy');
-                        save([outputPath filesep 'finalPredAllROIs.mat'],...
-                            'finalPred');
-                        clear concatAccuracy finalPred;
+                        save([outputPath filesep ROI '_permutedAcc.mat'],'finalAcc');
+                        summary{row,header}=accuracy;
+                        summary{row,header+1}=num2str(skewness(finalAcc));
+                        summary{row,header+2}=num2str(kurtosis(finalAcc));
+                        header=header+3;
+                        
+                        clear finalAcc;
+                end
+                
+                % Drops to next row if remainder is 0 (e.g. all regions have been
+                % entered for a given subject)
+                if iterCheck == 0
+                    summary{row,header}=num2str(...
+                        length(partitions.test_indices{1,1}));
+                    summary{row,header+1}=num2str(...
+                        length(partitions.train_indices{1,1}));
+                    row=row+1;
+                    header=3;
+                    headerTrialType=3;
+                    
+                    switch bootstrap.flag
+                        case 'No'
+                            % Save mat file with predictions separately
+                            save([outputPath filesep 'finalPredictions.mat'],...
+                                'finalPredictions');
+                            save([outputPath filesep 'finalAccuracy.mat'],'correct');
+                            clear finalPredictions correct;
+                        case 'Yes'
+                            save([outputPath filesep 'allROIPermuteACC.mat'],...
+                                'concatAccuracy');
+                            save([outputPath filesep 'finalPredAllROIs.mat'],...
+                                'finalPred');
+                            clear concatAccuracy finalPred;
+                    end
                 end
             end
+        catch
+            error(['Unable to record classifier accuracy for ' subject '!']);
         end
-    catch
-        error(['Unable to record classifier accuracy for ' subject '!']);
+        
     end
-    
 end
 
 %% Save summary files of SVM classifation.
 try
     if strcmpi(analysisType,'Searchlight')==0
         
-        % Save classifier outputs
-        save([fileparts(outputPath) filesep 'finalTable.mat'],'finalTable');
-        switch bootstrap.flag
-            case 'No'
-                save([fileparts(outputPath) filesep 'finalTableTrialType.mat'],...
-                    'finalTableTrialTypeAcc')
-        end
+        % Save summary classifier accuracies as mat file
+        save([fileparts(outputPath) filesep 'summary.mat'],'summary');
         
         % Copy summary file to temp variable and remove headers
-        temp=finalTable;
+        temp=summary;
         temp(:,1:2)=[];
         temp(1,:)=[];
         
@@ -756,22 +625,24 @@ try
             case 'No'
                 %% One-Sample T-test
                 % Subject Counter
-                index=size(finalTable,1);
+                index=size(summary,1);
                 
-                for i=2:(size(finalTable,2)-2)
+                for i=2:(size(summary,2)-2)
                     % Row header information
                     if i==2
                         
                         labelVec={strcat('Statistics (Tested against chance: ',num2str...
-                            (1/length(conds)),')'),'Significant at p<0.05?','mean',...
-                            'min','max','p value','Confidence Interval','t value',...
+                            (1/length(taskInfo.Conditions)),')'),...
+                            'Significant at p<0.05?','mean','min','max',...
+                            'p value','Confidence Interval','t value',...
                             'df','sd','se'};
                         
-                        finalTable(index+1:index+length(labelVec),1)=labelVec;
+                        summary(index+1:index+length(labelVec),1)=labelVec;
                         
                     else
                         % ROI specific statistics
-                        [h,p,ci,stats]=ttest(tempDouble(:,i-2),(1/length(conds)));
+                        [h,p,ci,stats]=ttest(tempDouble(:,i-2),...
+                            (1/length(taskInfo.Conditions)));
                         if h==1
                             sig='Yes';
                         else
@@ -782,33 +653,33 @@ try
                             max(tempDouble(:,i-2)),p,ci,stats.tstat,num2str(stats.df),...
                             stats.sd,stats.sd/sqrt(size(tempDouble,1))};
                         
-                        finalTable(index+2:index+length(subjVec)+1,i)=subjVec;
+                        summary(index+2:index+length(subjVec)+1,i)=subjVec;
                         
                         clear h p ci stats sig;
                     end
                     
                     % Save mat file with statistics separately
-                    save([out_path '_' classType filesep 'finalTable_stats.mat'],'finalTable');
+                    save([fileparts(outputPath) filesep 'summary_stats.mat'],'summary');
                     
                 end
             case 'Yes'
                 %% Compare True Accuracy to Permutation Classification
                 criticalCutoff = mean(tempDouble);
                 
-                for i=1:length(rois)
+                for i=1:length(masks)
                     
                     % Create aggregate table of classification
                     if i==1
-                        finalTableBootstrap=cell(4,length(rois)+1);
+                        finalTableBootstrap=cell(4,length(masks)+1);
                         finalTableBootstrap{2,1}='True Accuracy';
                         finalTableBootstrap{3,1}='Permutations greater than True Accuracy';
                         finalTableBootstrap{4,1}='Bootstrap p value';
-                        tempcount=2;
+                        tmpCnt=2;
                         
                         for header=1:length(rois)
-                            finalTableBootstrap{1,tempcount}=strcat...
-                                (rois{1,header}(1:end-4),'_Accuracy');
-                            tempcount=tempcount+1;
+                            finalTableBootstrap{1,tmpCnt}=strcat...
+                                (masks{1,header}(1:end-4),'_Accuracy');
+                            tmpCnt=tmpCnt+1;
                         end
                         
                         row=2;
@@ -855,13 +726,13 @@ try
         
         switch bootstrap.flag
             case 'No'
-                % Save classifier accuracy and one-sample t-tets results to
+                % Save classifier accuracy and one-sample t-test results to
                 % CSV file
-                file = fopen([out_path '_MVPA' filesep  'allAccuraciesSummary.csv'], 'w');
+                file = fopen([fileparts(outputPath) filesep  'allClassAccSummary.csv'], 'w');
                 
-                for a=1:size(finalTable,1)
-                    for b=1:size(finalTable,2)
-                        var = eval('finalTable{a,b}');
+                for a=1:size(summary,1)
+                    for b=1:size(summary,2)
+                        var = eval('summary{a,b}');
                         try
                             fprintf(file, '%s', var);
                         end
@@ -871,40 +742,25 @@ try
                 end
                 fclose(file);
                 
-                % Save classifier accuracy by trial type/behavior to CSV
-                file = fopen([out_path '_MVPA' filesep 'allAccuraciesByTrialType.csv'], 'w');
-                
-                for a=1:size(finalTableTrialTypeAcc,1)
-                    for b=1:size(finalTableTrialTypeAcc,2)
-                        var = eval('finalTableTrialTypeAcc{a,b}');
-                        try
-                            fprintf(file, '%s', var);
-                        end
-                        fprintf(file, ',');
-                    end
-                    fprintf(file, '\n');
-                end
-                fclose(file);
-                
-                %Run R Markdown graph
-                try
-                    % Directory variables
-                    curDir = pwd;
-                    markdown = which('anovaGraphOnlyMarkdown.r');
-                    
-                    % Call R script from command line
-                    cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
-                        '''; knit(''' markdown ''', ''anovaGraphOnlyMarkdown.html'')"'];
-                    [status,cmdout] = system(cmd);
-                    
-                    % Move HTML to output folder
-                    setenv('dataPath',analysis);
-                    setenv('curDir',curDir);
-                    !mv -t $dataPath $curDir/analyses/anovaGraphOnlyMarkdown.html figure/
-                    
-                catch
-                    message('Unable to save table and figure!');
-                end
+                %Run R Markdown graph %%% IN DEVELOPMENT %%%
+%                 try
+%                     % Directory variables
+%                     curDir = pwd;
+%                     markdown = which('anovaGraphOnlyMarkdown.r');
+%                     
+%                     % Call R script from command line
+%                     cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
+%                         '''; knit(''' markdown ''', ''anovaGraphOnlyMarkdown.html'')"'];
+%                     [status,cmdout] = system(cmd);
+%                     
+%                     % Move HTML to output folder
+%                     setenv('dataPath',analysis);
+%                     setenv('curDir',curDir);
+%                     !mv -t $dataPath $curDir/analyses/anovaGraphOnlyMarkdown.html figure/
+%                     
+%                 catch
+%                     message('Unable to save table and figure!');
+%                 end
                 
             case 'Yes'
                 % Save comparison of permuted and true accuracy to CSV file

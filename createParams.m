@@ -90,7 +90,7 @@ try
         'Conditions',[1 35],{'e.g. face, object, place'});
     
     % Conditions of Interest
-    taskInfo.accuracyFlag = questdlg('Is accuracy possoble? (i.e. interactive vs. static task)',...
+    taskInfo.accuracyFlag = questdlg('Is accuracy possible? (i.e. interactive vs. static task)',...
         'Confirm Accuracy Potential',...
         'Yes','No','Cancel','No');
     
@@ -125,16 +125,16 @@ try
     Mask.name = 'name_of_mask.nii';
     
     switch preprocPipeline
-        case 'SPM12'
+        case 'spm23'
             Func.dir         = [directory.Project filesep rawData.funcDir];
             Func.wildcard    = '^ar.*\.nii'; % File
             taskInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
                 'Number of Slices',[1 35],{'50'});
             taskInfo.Slices = str2double(taskInfo.Slices{:});
             
-        case 'fMRIPrep'
+        case 'fmrirep'
             Func.dir         = [directory.Project filesep rawData.funcDir];
-            Func.wildcard    = ['^*' taskName '_run-']; % File
+            Func.wildcard    = ['^*' taskInfo.Name '_run-']; % File
             
     end
     
@@ -143,38 +143,41 @@ catch
 end
 
 %% Project Paths
-
-% General path setup
-directory.Analysis = [directory.Project filesep 'multivariate'];
-directory.Model = [directory.Analysis filesep 'models' filesep ...
-    'SingleTrialModel' taskName];
-setenv('analysisPath',directory.Model);
-!mkdir -p $analysisPath
-
-analysisList = {'MVPA','RSA','ERS'};
-
-[index,tf] = listdlg('PromptString','Select Multivariate Analysis:',...
-    'SelectionMode','Single','ListString',analysisList);
-
-classType = analysisList{index};
-
-% Select analysis type. No searchlight is default
-analysisType = questdlg('Select Analysis Level for Multivariate Test:',...
-    'Confirm Searchlight',...
-    'Searchlight','ROI','Cancel','ROI');
-
-% Account for RT/regress out. No is default
-regressRT.flag = questdlg('Regress out Reaction Time (RT)?',...
-    'Confirm Regression',...
-    'Yes','No','Cancel','No');
-
-switch analysisType
-    case 'Searchlight'
-        roiPath     = [directory.Project 'ROIs/searchlight'];
-        searchlight = 'Yes';
-    otherwise
-        roiPath     = '/path/to/common/mask/folder';
-        searchlight = 'No';
+try
+    % General path setup
+    directory.Analysis = [directory.Project filesep 'multivariate'];
+    directory.Model = [directory.Analysis filesep 'models' filesep ...
+        'SingleTrialModel' taskInfo.Name];
+    setenv('analysisPath',directory.Model);
+    !mkdir -p $analysisPath
+    
+    analysisList = {'MVPA','RSA','ERS'};
+    
+    [index,tf] = listdlg('PromptString','Select Multivariate Analysis:',...
+        'SelectionMode','Single','ListString',analysisList);
+    
+    classType = analysisList{index};
+    
+    % Select analysis type. No searchlight is default
+    analysisType = questdlg('Select Analysis Level for Multivariate Test:',...
+        'Confirm Searchlight',...
+        'Searchlight','ROI','Cancel','ROI');
+    
+    % Account for RT/regress out. No is default
+    regressRT.flag = questdlg('Regress out Reaction Time (RT)?',...
+        'Confirm Regression',...
+        'Yes','No','Cancel','No');
+    
+    switch analysisType
+        case 'Searchlight'
+            roiPath     = [directory.Project 'ROIs/searchlight'];
+            searchlight = 'Yes';
+        otherwise
+            roiPath     = '/path/to/common/mask/folder';
+            searchlight = 'No';
+    end
+catch
+    error('Unable to set project path information!');
 end
 
 %% Classification Flags
@@ -188,13 +191,11 @@ try
             'Yes','No','Cancel','No');
         
         if strcmpi(bootstrap.flag,'Yes')==1
-            bootstrap.numRuns     = runs;
-            bootstrap.numRows     = numRows;
-            bootstrap.numTrials   = bootstrap.numRows/...
-                bootstrap.numRuns;
+            bootstrap.numRuns     = taskInfo.Runs;
+            bootstrap.numTrials   = taskInfo.Trials;
             bootstrap.perm        = inputdlg('How many permutations?',...
                 'Permutation Number',[1 35],{'1000'});
-            bootstrap.perm = str2double(searchlightSize{:});
+            bootstrap.perm = str2double(bootstrap.perm{:});
             
             bootstrap.trialsPerRun = randperm(length...
                 (1:bootstrap.numTrials));
@@ -326,14 +327,19 @@ try
                 bootstrap.flag,'_',metric,'_',num2str(searchlightSize),...
                 '.mat');
         otherwise
-            %Working
-            conds=char(taskInfo.Conditions);
-            conds=reshape(conds,[1 (size(conds,1)*size(conds,2))]);
+            for i=1:length(taskInfo.Conditions)
+                if i==1
+                    conds=taskInfo.Conditions{i};
+                else
+                    conds=[conds '-' taskInfo.Conditions{i}];
+                end
+                
+            end
             
             %End Working
-            filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
-                taskInfo.Name,'_',classType,'_',analysisType,'_',Conditions{1},...
-                '_',Conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
+            filename=strcat(directory.Analysis,'/params_',preprocPipeline,...
+                '_',taskInfo.Name,'_',classType,'_',analysisType,'_Conds_',...
+                conds,'_subConds_',subconditionFlag,'_Bootstrap_',...
                 bootstrap.flag,'.mat');
     end
     
@@ -345,12 +351,12 @@ end
 switch analysisType
     case 'Searchlight'
         save(filename,'directory','rawData','preprocPipeline',...
-            'taskInfo','Model','Mask', 'Func','Mot','classType',...
+            'taskInfo','Model','Mask', 'Func','classType',...
             'subjects','analysisType','regressRT','roiPath','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize');
     otherwise
         save(filename,'directory','rawData','preprocPipeline',...
-            'taskInfo','Model','Mask', 'Func','Mot','classType',...
+            'taskInfo','Model','Mask','Func','classType',...
             'subjects','analysisType','regressRT','roiPath','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns');
 end
