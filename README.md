@@ -1,11 +1,11 @@
-# CANLab-Multivariate-Pipeline
-This package is a data processing pipeline for performing multivariate imaging analyses using fMRI data. Currently the pacakge can can compute  Multivoxel Pattern Analysis (MVPA), Represetational Similarity Analysis (RSA), and Encoding-Retireval Similarity analysis (ERS). The package requires:
+# multi-FRAME
+The multi-FRAME (**multi**variate-**F**mri **R**s**A** **M**vpa **E**rs) package is a data processing pipeline for performing multivariate imaging analyses using fMRI data. Currently the pacakge can can compute  Multivoxel Pattern Analysis (MVPA), Represetational Similarity Analysis (RSA), and Encoding-Retireval Similarity analysis (ERS). The package requires:
 
 * [MATLAB R2017b](https://www.mathworks.com/products/matlab.html) (Working in >=2019a functionality)
 * [SPM12](https://www.fil.ion.ucl.ac.uk/spm/)
 * [CoSMoMVPA toolbox](http://www.cosmomvpa.org/) (Also available [on Github](https://github.com/CoSMoMVPA/CoSMoMVPA))
 
-## Function Description
+## Main Package Functions
 
 ```createParams.m```
 Creates a parameter MAT file with all relevant information for preprocessing model specification/estimation, and multivariate analyses. Also includes querying location and registration of regions of interest (ROIs) to be used for multivaraite analyses. Parameter file is named using processing choices made within the script to aid in file identification.
@@ -15,7 +15,10 @@ Estimates a single trial model for every trial of interest using SPM12. The resu
 Requires SPM
 
 ```preprocessData.m```
-Performs 1st level preprocessing on functional data, including registration of functional images, slice scan time correction, and motion calculation. 
+Performs 1st level preprocessing on functional data, including registration of functional images, slice scan time correction, and motion calculation.
+
+```maskRegistration```
+Transforms and registers mask file (```.nii/.nii.gz```) to each subject single trial model for use in multivariate analyses. Files saved as ```nii.gz```.
 
 ```runMVPAClassification.m```
 Runs MVPA within singular ROIs or a Searchlight within mask provided by user. Currently employs SVM classifier for ROI level, and LDA for searchlight. Output is saved as tidyverse-formatted CSV file and as MAT files. Searchlight results are saved as weights NiFTi files. Summary CSV file is generated as well, concatnating all subject accuracies. 
@@ -34,10 +37,17 @@ The package is built around a specific hierarchal structure inspired by the [BID
 ```
 projectTemplate
 ├── multivariate^
-│   ├── models^
-│   |   └── SingleTrialModelencoding^
+│   ├── masks^
+│   |   └── params_fmriprep_localizer_MVPA_conditions_face_object_ROI^
 │   |       ├── sub-y001
 │   |       └── sub-y002
+│   ├── models^
+│   |   ├── SingleTrialModellocalizer^
+│   |   |   ├── sub-y001
+│   |   |   └── sub-y002
+│   |   └── params_fmriprep_localizer_MVPA_conditions_face_object_ROI^
+│   |   |   ├── sub-y001
+│   |   |   └── sub-y002
 │   ├── params_spm12_encoding_MVPA_conditions_face_object_ROI.mat
 │   └── params_fmriprep_encoding_MVPA_conditions_face_object_ROI.mat
 ├── preprocessing
@@ -45,16 +55,14 @@ projectTemplate
 │   │   ├── fmriprep
 │   │   │   ├── logs
 │   │   │   ├── sub-y001
-│   │   │   ├── sub-y002
-│   │   │   └── sub-y003
+│   │   │   └── sub-y002
 │   │   ├── fmriprep_wf
 │   │   ├── freesurfer
 │   │   └── reportlets
 │   └── spmPreprocessing^
 │       ├── psfiles
 │       ├── sub-y001
-│       ├── sub-y002
-│       └── sub-y003
+│       └── sub-y002
 ├── rawdata
 │   ├── sub-y0001
 │   │   ├── anat
