@@ -89,10 +89,11 @@ THe package is currently equipped to either preprocess data in SPM12 or take dat
 2. ```preprocessData.m```        - Preprocess functional data via SPM12 or organize motion regressors from fMRIPrep.
 3. ```specifyModel.m```          - Specifiy SPM model with information for trials of interest (i.e. trials to use for classification/representation).
 4. ```estimateModel.m```         - Estimate model with every trials as its own individual regressor.
-5. ```runMVPAClassification.m``` - Perform multivariate classification using previously derived model.
+5. ```maskRegistration```        - Register mask files to individual trial model data.
+6. ```runMVPAClassification.m``` - Perform multivariate classification using previously derived model.
 
 
-## Work using the Package
+## Current Work Using the Package
 ### Publications
 Dennis, N. A., & Overman, A. A., Gerver, C. R., McGraw, K., Rowley, M. A., & Salerno, J. M. (2019). *Different types of associative encoding evoke differential processing in both younger and older adults: evidence from univariate and multivariate analyses.* Neuropsychologia, 135. https://doi.org/10.1016/j.neuropsychologia.2019.107240
 
