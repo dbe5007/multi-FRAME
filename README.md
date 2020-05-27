@@ -1,7 +1,7 @@
 # multi-FRAME
 The multi-FRAME (**multi**variate-**F**mri **R**s**A** **M**vpa **E**rs) package is a data processing pipeline for performing multivariate imaging analyses using fMRI data. Currently the package can compute  Multivoxel Pattern Analysis (MVPA), Representational Similarity Analysis (RSA), and Encoding-Retrieval Similarity analysis (ERS). The package requires:
 
-* [MATLAB R2017b](https://www.mathworks.com/products/matlab.html) (Working in >=2019a functionality)
+* [MATLAB R2017b](https://www.mathworks.com/products/matlab.html)
 * [SPM12](https://www.fil.ion.ucl.ac.uk/spm/)
 * [CoSMoMVPA toolbox](http://www.cosmomvpa.org/) (Also available [on Github](https://github.com/CoSMoMVPA/CoSMoMVPA))
 
