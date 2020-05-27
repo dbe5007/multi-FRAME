@@ -101,3 +101,9 @@ Gerver, C. R., Overman, A. A., Babu, H. J., Hultman, C. E., & Dennis, N. A. (in 
 ### Presentations
 Elbich, D., Adams, R.B., Kveraga, K., Dennis, N.A. (May, 2020). *Discriminability of Neural Patterns within the Magnocellular and Parvocellular Visual Pathways.* Poster presented at the Cognitive Neuroscience Society Conference, Boston, Massachusetts.
 
+Chamberlain, J. D., Turney, I. C., Dennis, N. A., Neural Discriminability Increases in Older Adults Following Cognitive Training to Reduce False Memories. Accepted to be presented at the annual Cognitive Aging Conference (2020), Atlanta, GA (Postponed)
+
+Chamberlain, J. D., Turney, I. C., Dennis, N. A., Encoding-Retrieval Similarity (ERS) of Perceptually Related Items and Their Relation to False Memories in Aging. Presented at the Cognitive Neuroscience Society’s Virtual Annual Meeting (May, 2020), Boston, MA
+ 
+Chamberlain, J. D., Hultman, C., Martinez, V., Carpenter, C., Overman, A., Dennis, N., Configuration Manipulation Impacts Neural Patterns in Medial Temporal Lobe in Associative Memory Retrieval. Presented at the Cognitive Neuroscience Society’s Annual Meeting (March, 2019c), San Francisco, CA
+
