@@ -21,64 +21,37 @@
 %% Pre-Analysis Setup
 
 % Add CoSMoMVPA to the MATLAB search path
-%addpath(genpath('/path/to/CoSMoToolbox'));
-addpath(genpath...
-    ('/gpfs/group/nad12/default/nad12/toolbox/CoSMoMVPA-master/CoSMoMVPA-master'));
+addpath(genpath('/path/to/CoSMoToolbox'));
+
+% Required for boostrap code to function
+%addpath('/path/to/CANLab-Multivariate-Scripts/functions/cosmo_crossvalidate_bootstrap.m');
+addpath(fileparts(which('cosmo_crossvalidate_bootstrap.m')));
 
 % turn cosmo warnings off
 cosmo_warning('off');
 
 %% Set Analysis Parameters & Paths
 % Load subject IDs, ROIs, and Condition flags
-if exist('flag','var')==0
+if exist('flag','var') == 0
     
     %Select parameter file is flag does not exist
-    uiopen('*.mat')
+    [file,path]=uigetfile('*.mat','Select params file');
+    filename=fullfile(path,file);
+    load(filename);
     
 end
 
 % Filepath for results folder
-parentDir = fileparts(studyPath);
+parentDir = directory.Model;
 
 % Base output directory name
-switch analysisType
-    case 'Searchlight'
-        analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-            analysisType,'_',trialAnalysis,'_',metric,'_',...
-            num2str(searchlightSize),'_',conds{1,1},'_',conds{1,2});
-    otherwise
-        if exist('subConds','var')
-            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',...
-                conds{1,2},'_',subConds{1,1},'_',subConds{1,2});
-        else
-            analysis=strcat(parentDir,'/',analysisName,'_',classType,'_',...
-                analysisType,'_',trialAnalysis,'_',conds{1,1},'_',conds{1,2});
-        end
-end
+analysis = [directory.Analysis filesep 'models' filesep file(1:end-4)];
 
-% Bootstrap flag
-switch bootstrap.flag
-    case 'Yes'
-        analysis = [analysis '_Bootstrap'];
-end
+%Debug
+subjects(2)=[];
 
 %% Main Body
-for iteration=1:length(subjects)*length(rois)
-    
-    % Loop count for all subject/region combinations
-    if iteration==1
-        subjCount=1;
-        regionCount=1;
-    elseif mod(iteration,length(rois))==mod(1,length(rois))
-        subjCount=subjCount+1;
-        regionCount=1;
-    elseif mod(iteration,length(rois))>=0
-        regionCount=regionCount+1;
-    end
-    
-    subject = subjects{subjCount};
-    ROI     = rois{regionCount};
+for iteration=1:length(subjects)
     
     %% Subject-Specific Directories
     
@@ -87,180 +60,166 @@ for iteration=1:length(subjects)*length(rois)
     %  spmFile  = fullpath to this subject's SPM.mat file. Note: the
     %                 :beta appended to the end tells cosmo to pull the beta
     %                 information from the SPM.mat file.
-    dataPath   = fullfile(studyPath, subject);
-    outputPath = fullfile(analysis, subject);
-    spmFile = [dataPath '/SPM.mat'];
+    dataPath   = fullfile(directory.Model, subjects{iteration});
+    outputPath = fullfile(analysis, subjects{iteration});
+    spmFile = [dataPath '/SPM_gz.mat'];
     
     % create the output path if it doesn't already exist
     if ~exist(outputPath, 'dir')
         mkdir(outputPath)
     end
     
-    % Path to current region mask
-    curROI = fullfile(roi_path, ROI);
-    %curROI = fullfile(roi_path, subject, ROI);
+    %% Load Mask Data
+    masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
+        filesep subjects{iteration} filesep '*.nii.gz']);
     
-    switch classificationType
-        case 'RSA'
-            %%% Loading ROI data into CosmoMVPA - use SPM betas
-            % Note that loading data through the SPM.mat file will automatically
-            % "chunk" by runs, which is what we want
-            fprintf('Loading data from ROI: %s\n',ROI);
-            currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
-            
-            %%% Tidy up the dataset
-            % Remove constant features
-            currDataset=cosmo_remove_useless_data(currDataset);
-            
-            switch regressRT.flag
-                case 'Yes'
-                    files = dir([study_path filesep subject filesep 'Run*']);
-                    for i=1:length(files)
-                        curMat(i) = load([files(i).folder filesep files(i).name]);
-                        if i==length(files)
-                            rtCell = [curMat.RT];
-                            
-                            % Convert from cell to double for regression
-                            for ii=1:length(rtCell)
+    %Debug
+    masks=masks(1:3);
+    
+    for curMask = 1:length(masks)
+        
+        switch classType
+            case 'RSA'
+                % Path to current region mask
+                curROI = fullfile(masks(curMask).folder, masks(curMask).name);
+                
+                % Current region name
+                regionName=erase(masks(curMask).name,'.nii.gz');
+                
+                %%% Loading ROI data into CosmoMVPA - use SPM betas
+                % Note that loading data through the SPM.mat file will automatically
+                % "chunk" by runs, which is what we want
+                fprintf('Loading data from ROI: %s\n',masks(curMask).name);
+                currDataset=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
+                
+                % Clear errant Not a Number (NaN) values
+                % Remove constant features
+                currDataset=cosmo_remove_useless_data(currDataset);
+                
+                switch regressRT.flag
+                    case 'Yes'
+                        files = dir([study_path filesep subject filesep 'Run*']);
+                        for i=1:length(files)
+                            curMat(i) = load([files(i).folder filesep files(i).name]);
+                            if i==length(files)
+                                rtCell = [curMat.RT];
                                 
-                                % Flag outlier RT greater than 4 seconds
-                                if double(rtCell{ii}) >= regressRT.trialSec
-                                    rtDouble(ii,1) = regressRT.trialSec;
-                                else
-                                    rtDouble(ii,1) = double(rtCell{ii});
+                                % Convert from cell to double for regression
+                                for ii=1:length(rtCell)
+                                    
+                                    % Flag outlier RT greater than 4 seconds
+                                    if double(rtCell{ii}) >= regressRT.trialSec
+                                        rtDouble(ii,1) = regressRT.trialSec;
+                                    else
+                                        rtDouble(ii,1) = double(rtCell{ii});
+                                    end
                                 end
+                                
+                                % Replace with trial duration (set in params)
+                                rtDouble(isnan(rtDouble))=regressRT.trialSec;
+                            end
+                        end
+                        
+                        for i=1:length(currDataset.samples)
+                            model = LinearModel.fit(rtDouble,currDataset.samples(:,i));
+                            if i==1
+                                allResiduals = model.Residuals.Raw;
+                            else
+                                allResiduals = [allResiduals model.Residuals.Raw];
+                            end
+                        end
+                        
+                        zscoreResid = zscore(allResiduals);
+                        currDataset.samples = zscoreResid;
+                        
+                        clear files curMat rtCell rtDouble model allResiduals zscoreResid;
+                end
+            case 'ERS'
+                disp('Skipping to ERS...');
+        end
+        
+        %% Define trial information
+        switch classType
+            case 'RSA'
+                try
+                    % Identify trials of interest for each condition
+                    if exist('subConds','var')
+                        
+                        for ii=1:length(taskInfo.Conditions)
+                            
+                            subCond.(taskInfo.Conditions{1,ii})=contains(currDataset.sa.labels, taskInfo.Conditions{1,ii});
+                            counter=1;
+                            
+                            for iii=1:length(subConds)
+                                subCond.(taskInfo.Conditions{1,ii})(:,counter+1)=contains...
+                                    (currDataset.sa.labels, subConds{1,iii});
+                                counter=counter+1;
                             end
                             
-                            % Replace with trial duration (set in params)
-                            rtDouble(isnan(rtDouble))=regressRT.trialSec;
-                        end
-                    end
-                    
-                    for i=1:length(currDataset.samples)
-                        model = LinearModel.fit(rtDouble,currDataset.samples(:,i));
-                        if i==1
-                            allResiduals = model.Residuals.Raw;
-                        else
-                            allResiduals = [allResiduals model.Residuals.Raw];
-                        end
-                    end
-                    
-                    zscoreResid = zscore(allResiduals);
-                    currDataset.samples = zscoreResid;
-                    
-                    clear files curMat rtCell rtDouble model allResiduals zscoreResid;
-            end
-        case 'ERS'
-            disp('Skipping to ERS...');
-    end
-    
-    %% Define trial information
-    switch classificationType
-        case 'RSA'
-            try
-                if exist('subConds','var')
-                    
-                    % Comment out for non-ICEE
-                    subConds{1,2}=[];
-                    subConds={subConds{1,1}};
-                    
-                    for ii=1:length(conds)
-                        
-                        %Orig
-                        %subCond.(conds{1,ii})=contains(currDataset.sa.labels, conds{1,ii});
-                        
-                        %ICEE
-                        subCond.(conds{1,ii})=contains(currDataset.sa.labels, ['-' conds{1,ii}]);
-                        counter=1;
-                        
-                        for iii=1:length(subConds)
-                            subCond.(conds{1,ii})(:,counter+1)=contains...
-                                (currDataset.sa.labels, subConds{1,iii});
-                            counter=counter+1;
+                            subCond.(taskInfo.Conditions{1,ii})=double(subCond.(taskInfo.Conditions{1,ii}));
+                            subCond.(taskInfo.Conditions{1,ii})(:,counter+1)=sum(subCond.(taskInfo.Conditions{1,ii})(:,1:counter),2);
+                            
                         end
                         
-                        subCond.(conds{1,ii})=double(subCond.(conds{1,ii}));
-                        subCond.(conds{1,ii})(:,counter+1)=sum(subCond.(conds{1,ii})(:,1:counter),2);
+                        Cond(1).idx = find(subCond.(taskInfo.Conditions{1,1})(:,counter+1) == counter);
+                        Cond(2).idx = find(subCond.(taskInfo.Conditions{1,2})(:,counter+1) == counter);
+                        
+                    else
+                        
+                        CondList = zeros(size(currDataset.samples,1),1);
+                        for ii=1:length(taskInfo.Conditions)
+                            Cond(ii).labels = ~cellfun(@isempty, strfind...
+                                (currDataset.sa.labels, taskInfo.Conditions{ii}));
+                            Cond(ii).idx = find(Cond(ii).labels == 1);
+                            
+                            CondList(Cond(ii).idx) = ii;
+                            
+                        end
                         
                     end
                     
-                    Cond(1).idx = find(subCond.(conds{1,1})(:,counter+1) == counter);
-                    Cond(2).idx = find(subCond.(conds{1,2})(:,counter+1) == counter);
+                    currDataset.sa.targets = CondList;
                     
-                    CondList = zeros(size(currDataset.samples,1),1);
-                    for ii=1:length(conds)
-                        
-                        CondList(Cond(ii).idx) = ii;
-                        
+                    % Codes trials/conditions of no interest as 0 (see SpecifyModel script
+                    % for trial tag information)
+                    Zeroidx = find(CondList == 0);
+                    
+                    % Removes all trials of no interest from analysis
+                    if isempty(Zeroidx)==0
+                        currDataset.samples(Zeroidx,:)=[];
+                        currDataset.sa.targets(Zeroidx)=[];
+                        currDataset.sa.beta_index(Zeroidx)=[];
+                        currDataset.sa.chunks(Zeroidx)=[];
+                        currDataset.sa.fname(Zeroidx)=[];
+                        currDataset.sa.labels(Zeroidx)=[];
                     end
                     
-                else
+                    fprintf('Number of possible targets: %i\n',length...
+                        (unique(currDataset.sa.targets)));
                     
-                    CondList = zeros(size(currDataset.samples,1),1);
-                    for ii=1:length(conds)
-                        Cond(ii).labels = ~cellfun(@isempty, strfind...
-                            (currDataset.sa.labels, conds{ii}));
-                        Cond(ii).idx = find(Cond(ii).labels == 1);
-                        
-                        CondList(Cond(ii).idx) = ii;
-                        
-                    end
+                    % Print dataset
+                    fprintf('Dataset input:\n');
                     
-                end
-                
-                currDataset.sa.targets = CondList;
-                
-                
-                %Codes trials/conditions of no interest as 0 (see SpecifyModel script
-                %for trial tag information)
-                Zeroidx = find(CondList == 0);
-                
-                %Removes all trials of no interest from analysis
-                if isempty(Zeroidx)==0
-                    currDataset.samples(Zeroidx,:)=[];
-                    currDataset.sa.targets(Zeroidx)=[];
-                    currDataset.sa.beta_index(Zeroidx)=[];
-                    currDataset.sa.chunks(Zeroidx)=[];
-                    currDataset.sa.fname(Zeroidx)=[];
-                    currDataset.sa.labels(Zeroidx)=[];
-                end
-            catch
-                warning('Failure to define trial information. Set to debug mode.');
-            end
-            
-            fprintf('Number of possible targets: %i\n',...
-                length(unique(currDataset.sa.targets)));
-            
-            % Print dataset
-            fprintf('Dataset input:\n');
-            
-            % Print dataset
-            fprintf('Number of samples: %i\n',...
-                size(currDataset.samples,1));
-            fprintf('Number of features (voxels): %i\n',...
-                size(currDataset.samples,2));
-            fprintf('Number of chunks (runs): %i\n',...
-                length(unique(currDataset.sa.chunks)));
-    end
-    
-    %% RSA ROI analysis
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    switch classificationType
-        % Single task RSA
-        case 'RSA'
-            switch analysisType
-                case 'Searchlight'
+                    % Print dataset
+                    fprintf('Number of samples: %i\n',...
+                        size(currDataset.samples,1));
+                    fprintf('Number of features (voxels): %i\n',...
+                        size(currDataset.samples,2));
+                    fprintf('Number of chunks (runs): %i\n',...
+                        length(unique(currDataset.sa.chunks)));
                     
-                    %COMING SOON!!!!
-                    
-                case 'ROI'
-                    
-                    % Calculate separate matrices for each condition & compare
-                    % those
-                    
-                    switch trialAnalysis
-                        case 'Individual'
+                    % RSA ROI analysis
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    switch analysisType
+                        case 'Searchlight'
+                            
+                            %%% IN PROGRESS %%%
+                            
+                        case 'ROI'
+                            
+                            % Calculate separate matrices for each condition & compare
+                            % those
+                            
                             % Split dataset into separate condition
                             % variables
                             for i=1:length(Cond)
@@ -277,533 +236,600 @@ for iteration=1:length(subjects)*length(rois)
                                 Conditions(i).sa.targets = [1:length(index)]';
                             end
                             
+                            % Re-index trials within condition into
+                            % separate targets
+                            Conditions(i).sa.targets = [1:length(index)]';
+                            
                             % Setup DSM and searchlight arguments
                             % DSM
-                            dsmArgs.metric = 'correlation';
-                            dsmArgs.center_data = 1;
+                            
+                            dsmArgs(i).metric = 'correlation';
+                            dsmArgs(i).center_data = 1;
+                            dsmArgs(i).trialType = taskInfo.Conditions(1,i);
                             
                             % Create Target DSM from Condtion 1
-                            targetDSM = cosmo_dissimilarity_matrix_measure(Conditions(1), dsmArgs);
+                            targetDSM(i) = cosmo_dissimilarity_matrix_measure(Conditions(i), dsmArgs(i));
+                            
+                            %Convert to similarity for all conds
+                            %individualls
+                            for ii=1:length(targetDSM(i).samples)
+                                if targetDSM(i).samples(ii)<1 && targetDSM(i).samples(ii)>0
+                                    newSim(ii,i) = 1 - targetDSM(i).samples(ii);
+                                else
+                                    newSim(ii,i) = -targetDSM(i).samples(ii);
+                                    newSim(ii,i) = newSim(ii,i) + 1;
+                                end
+                            end
                             
                             % Set target DSM
-                            dsmArgs.target_dsm = targetDSM.samples;
+                            dsmArgs(i).target_dsm = targetDSM(i).samples;
+                    end
+                    
+                    %New
+                    newRow=1;
+                    for i=1:length(taskInfo.Conditions)
+                        meanCorrWithinCondition{newRow,i} = mean(newSim(:,i));
+                    end
+                    newRow = newRow + 1;
+                    
+                    %end new
+                    
+                    % Get raw correlation matrix back
+                    % targetDSMCorrMatrix = cosmo_squareform(targetDSM.samples)
+                    % newCorrWithinMatrix = cosmo_squareform(newSim)
+                    
+                    % Obtain number of combinations with 2
+                    % conditions selected
+                    combinations=factorial(length(Cond))/...
+                        ((factorial(2)*(factorial(length(Cond)-2))));
+                    
+                    % Searchlight ERS for each condition separately
+                    iter=1;
+                    for i=1:combinations
+                        if i<length(Cond)
+                            condCount=1;
+                        elseif i<combinations
+                            condCount=2;
+                            if i==length(Cond)
+                                iter=condCount;
+                            end
+                        else
+                            condCount=3;
+                            iter=condCount;
+                        end
+                        
+                        rho(1,i) = cosmo_target_dsm_corr_measure...
+                            (Conditions(condCount),dsmArgs(iter+1));
+                        
+                        TrialTypeCombo(1,i) = {strcat(taskInfo.Conditions{condCount},'_v_',taskInfo.Conditions{iter+1})};
+                        
+                        iter=iter+1;
+                    end
+                    
+                    
+                    clear targetDSM Conditions;
+                end
+                
+                %% ERS analysis
+            case 'ERS'
+                switch analysisType
+                    case 'Searchlight'
+                        %%% Loading ROI data into CosmoMVPA - use SPM betas
+                        fprintf('Loading data from ROI: %s\n',ROI);
+                        for i=1:length(tasks)
+                            
+                            spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
+                                subject '/SPM_gz.mat'];
+                            spmFile = [dataPath '/SPM_gz.mat'];
+                            currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
+                            
+                        end
+                        
+                        % Remove NaN voxels in both datasets
+                        for i=1:size(currDataset(1).samples,2)
+                            for j=1:length(tasks)
+                                remove(j) = isnan(currDataset(j).samples(1,i));
+                            end
+                            
+                            if sum(remove)>=1
+                                removeVoxels(i) = 1;
+                            else
+                                removeVoxels(i) = 0;
+                            end
+                        end
+                        
+                        for i=1:length(tasks)
+                            currDataset(i).samples(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.i(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.j(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.k(:,logical(removeVoxels))=[];
+                            
+                            if strcmpi(task{i},'Retrieval')==1
+                                switch regressRT.flag
+                                    case 'Yes'
+                                        files = dir([study_path filesep subject filesep 'Run*']);
+                                        for j=1:length(files)
+                                            curMat(j) = load([files(j).folder filesep files(j).name]);
+                                            if j==length(files)
+                                                rtCell = [curMat.RT];
+                                                
+                                                % Convert from cell to double for regression
+                                                for k=1:length(rtCell)
+                                                    
+                                                    % Flag outlier RT greater than 4 seconds
+                                                    if double(rtCell{k}) >= regressRT.trialSec
+                                                        rtDouble(k,1) = regressRT.trialSec;
+                                                    else
+                                                        rtDouble(k,1) = double(rtCell{k});
+                                                    end
+                                                end
+                                                
+                                                % Replace with trial duration (set in params)
+                                                rtDouble(isnan(rtDouble))=regressRT.trialSec;
+                                            end
+                                        end
+                                        
+                                        % Z-Score RT values
+                                        rtDouble = zscore(rtDouble);
+                                        
+                                        for jj=1:length(currDataset.samples)
+                                            model = LinearModel.fit(rtDouble,currDataset.samples(:,j));
+                                            if j==1
+                                                allResiduals = model.Residuals.Raw;
+                                            else
+                                                allResiduals = [allResiduals model.Residuals.Raw];
+                                            end
+                                        end
+                                        
+                                        zscoreResid = zscore(allResiduals);
+                                        currDataset.samples = zscoreResid;
+                                        
+                                        clear files curMat rtCell rtDouble model allResiduals zscoreResid;
+                                end
+                                
+                            end
+                            
+                            try
+                                if exist('subConds','var')
+                                    
+                                    subConds{1,2}=[];
+                                    subConds={subConds{1,1}};
+                                    
+                                    for ii=1:length(conds)
+                                        
+                                        subCond(ii).idx=contains(currDataset(i).sa.labels, ['-' conds{ii}]);
+                                        counter=1;
+                                        
+                                        for iii=1:length(subConds)
+                                            subCond(ii).idx(:,counter+1)=contains(currDataset(i).sa.labels, subConds{1,iii});
+                                            counter=counter+1;
+                                        end
+                                        
+                                        subCond(ii).idx=double(subCond(ii).idx);
+                                        subCond(ii).idx(:,counter+1)=sum(subCond(ii).idx(:,1:counter),2);
+                                        
+                                    end
+                                    
+                                    Cond(1).idx = find(subCond(1).idx(:,counter+1) == counter);
+                                    Cond(2).idx = find(subCond(2).idx(:,counter+1) == counter);
+                                    
+                                else
+                                    
+                                    for ii=1:length(conds)
+                                        Cond(ii).labels = ~cellfun(@isempty, strfind...
+                                            (currDataset(i).sa.labels, ['-' conds{ii}]));
+                                        Cond(ii).idx = find(Cond(ii).labels == 1);
+                                    end
+                                    
+                                end
+                                
+                            catch
+                                warning('Failure to define trial information. Set to debug mode.');
+                            end
+                        end
+                        
+                        % Parse data by task and condition
+                        counter=1;
+                        for i=1:length(currDataset)
+                            for ii=1:length(Cond)
+                                if strcmpi(task{i},'Retrieval')==1
+                                    retData(ii)=currDataset(i);
+                                    retData(ii).samples=retData(ii).samples(Cond(ii).idx,:);
+                                    retData(ii).sa.beta_index=retData(ii).sa.beta_index(Cond(ii).idx);
+                                    retData(ii).sa.chunks=retData(ii).sa.chunks(Cond(ii).idx);
+                                    retData(ii).sa.fname=retData(ii).sa.fname(Cond(ii).idx);
+                                    retData(ii).sa.labels=retData(ii).sa.labels(Cond(ii).idx);
+                                    retData(ii).sa.targets=retData(ii).sa.targets(Cond(ii).idx);
+                                    %retData(ii).sa.targets=[1:length(Cond(ii).idx)]';
+                                else
+                                    encData(ii)=currDataset(i);
+                                    encData(ii).samples=encData(ii).samples(Cond(ii).idx,:);
+                                    encData(ii).sa.beta_index=encData(ii).sa.beta_index(Cond(ii).idx);
+                                    encData(ii).sa.chunks=encData(ii).sa.chunks(Cond(ii).idx);
+                                    encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).idx);
+                                    encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).idx);
+                                    encData(ii).sa.targets=encData(ii).sa.targets(Cond(ii).idx);
+                                    %encData(ii).sa.targets=[1:length(Cond(ii).idx)]';
+                                end
+                            end
+                        end
+                        
+                        % Setup DSM and searchlight arguments
+                        %DSM
+                        dsmArgs.metric = 'correlation';
+                        dsmArgs.center_data = 1;
+                        
+                        %Searchlight
+                        searchlightSize = 20;
+                        metric = 'count';
+                        measure = @cosmo_target_dsm_corr_measure;
+                        measure_args = struct();
+                        measure_args.type = 'Spearman';
+                        measure_args.center_data = 1;
+                        
+                        
+                        for i=1:length(Cond)
+                            
+                            % Create Target DSM from Encoding Run
+                            targetDSM(i) = cosmo_dissimilarity_matrix_measure(encData(i), dsmArgs);
+                            
+                            if i==1
+                                % Create Searchlight
+                                nbrhood=cosmo_spherical_neighborhood(retData(i),metric,searchlightSize);
+                            end
+                            
+                            % Set target DSM
+                            measure_args.target_dsm = targetDSM(i).samples;
                             
                             % Searchlight ERS for each condition separately
-                            rho = cosmo_target_dsm_corr_measure(Conditions(2),dsmArgs);
+                            results(i) = cosmo_searchlight(retData(i),nbrhood,measure,measure_args);
                             
-                            clear targetDSM Conditions;
-                            
-                        case 'Mean'
-                            %args.center_data=true;
-                            args.metric='correlation';
-                            args.type = 'Pearson';
-                            
-                            currDataset_mean = cosmo_fx...
-                                (currDataset,@(x)mean(x,1),'targets');
-                            currDataset_mean.samples(1,:) = zscore(currDataset_mean.samples(1,:));
-                            currDataset_mean.samples(2,:) = zscore(currDataset_mean.samples(2,:));
-                            currDatasetDSM = cosmo_dissimilarity_matrix_measure...
-                                (currDataset_mean,args);
-                            
-                            rho = (cosmo_squareform(currDatasetDSM.samples) - 1) * -1;
-                    end
-            end
-            
-            % ERS analysis
-        case 'ERS'
-            switch analysisType
-                case 'Searchlight'
-                    %%% Loading ROI data into CosmoMVPA - use SPM betas
-                    fprintf('Loading data from ROI: %s\n',ROI);
-                    for i=1:length(tasks)
-                        
-                        spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
-                            subject '/SPM.mat'];
-                        currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
-                        
-                    end
-                    
-                    % Remove errant voxels in both datasets
-                    for i=1:size(currDataset(1).samples,2)
-                        for j=1:length(tasks)
-                            remove(j) = isnan(currDataset(j).samples(1,i));
                         end
                         
-                        if sum(remove)>=1
-                            removeVoxels(i) = 1;
-                        else
-                            removeVoxels(i) = 0;
-                        end
-                    end
-                    
-                    for i=1:length(tasks)
-                        currDataset(i).samples(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.i(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.j(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.k(:,logical(removeVoxels))=[];
+                        save([outputPath '/searchlightResults_' metric '_' ...
+                            num2str(searchlightSize) '.mat'],'results');
                         
-                        if strcmpi(task{i},'Retrieval')==1
-                            switch regressRT.flag
-                                case 'Yes'
-                                    files = dir([study_path filesep subject filesep 'Run*']);
-                                    for j=1:length(files)
-                                        curMat(j) = load([files(j).folder filesep files(j).name]);
-                                        if j==length(files)
-                                            rtCell = [curMat.RT];
-                                            
-                                            % Convert from cell to double for regression
-                                            for k=1:length(rtCell)
+                        for i=1:length(conds)
+                            % Define output location
+                            if ~exist('subConds','var')
+                                output{i}=strcat(outputPath,'/',subject,...
+                                    '_ERS_Searchlight_',metric,'_',...
+                                    num2str(searchlightSize),'_',...
+                                    conds{i},'.nii');
+                            else
+                                output=strcat(outputPath,'/',subject,'_',...
+                                    classifier.name,'_Searchlight_',metric,'_',...
+                                    num2str(searchlightSize),'_',...
+                                    conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
+                            end
+                            
+                            % Store results to disk
+                            cosmo_map2fmri(results(i), output{i});
+                            
+                        end
+                        
+                    case 'ROI'
+                        %%% Loading ROI data into CosmoMVPA - use SPM betas
+                        fprintf('Loading data from ROI: %s\n',ROI);
+                        for i=1:length(tasks)
+                            
+                            spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
+                                subject '/SPM.mat'];
+                            currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
+                            
+                        end
+                        
+                        % Remove errant voxels in both datasets
+                        for i=1:size(currDataset(1).samples,2)
+                            for j=1:length(tasks)
+                                remove(j) = isnan(currDataset(j).samples(1,i));
+                            end
+                            
+                            if sum(remove)>=1
+                                removeVoxels(i) = 1;
+                            else
+                                removeVoxels(i) = 0;
+                            end
+                        end
+                        
+                        %%% Indentify trials of interest for each condition
+                        for i=1:length(tasks)
+                            currDataset(i).samples(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.i(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.j(:,logical(removeVoxels))=[];
+                            currDataset(i).fa.k(:,logical(removeVoxels))=[];
+                            
+                            % Mean center data
+                            currDataset(i).samples = bsxfun...
+                                (@minus,currDataset(i).samples,mean(currDataset(i).samples,1));
+                            
+                            if strcmpi(tasks{i},'Retrieval')==1
+                                switch regressRT.flag
+                                    case 'Yes'
+                                        files = dir([study_path filesep subject filesep 'Run*']);
+                                        for j=1:length(files)
+                                            curMat(j) = load([files(j).folder filesep files(j).name]);
+                                            if j==length(files)
+                                                rtCell = [curMat.RT];
                                                 
-                                                % Flag outlier RT greater than 4 seconds
-                                                if double(rtCell{k}) >= regressRT.trialSec
-                                                    rtDouble(k,1) = regressRT.trialSec;
-                                                else
-                                                    rtDouble(k,1) = double(rtCell{k});
+                                                % Convert from cell to double for regression
+                                                for k=1:length(rtCell)
+                                                    
+                                                    % Flag outlier RT greater than 4 seconds
+                                                    if double(rtCell{k}) >= regressRT.trialSec
+                                                        rtDouble(k,1) = regressRT.trialSec;
+                                                    else
+                                                        rtDouble(k,1) = double(rtCell{k});
+                                                    end
                                                 end
+                                                
+                                                % Replace with trial duration (set in params)
+                                                rtDouble(isnan(rtDouble))=regressRT.trialSec;
                                             end
-                                            
-                                            % Replace with trial duration (set in params)
-                                            rtDouble(isnan(rtDouble))=regressRT.trialSec;
                                         end
-                                    end
-                                    
-                                    % Z-Score RT values
-                                    rtDouble = zscore(rtDouble);
-                                    
-                                    for jj=1:length(currDataset.samples)
-                                        model = LinearModel.fit(rtDouble,currDataset.samples(:,j));
-                                        if j==1
-                                            allResiduals = model.Residuals.Raw;
-                                        else
-                                            allResiduals = [allResiduals model.Residuals.Raw];
+                                        
+                                        % Z-Score RT values
+                                        rtDouble = zscore(rtDouble);
+                                        
+                                        for jj=1:length(currDataset.samples)
+                                            model = LinearModel.fit(rtDouble,currDataset.samples(:,j));
+                                            if j==1
+                                                allResiduals = model.Residuals.Raw;
+                                            else
+                                                allResiduals = [allResiduals model.Residuals.Raw];
+                                            end
                                         end
-                                    end
-                                    
-                                    zscoreResid = zscore(allResiduals);
-                                    currDataset.samples = zscoreResid;
-                                    
-                                    clear files curMat rtCell rtDouble model allResiduals zscoreResid;
-                            end
-                            
-                        end
-                        
-                        try
-                            if exist('subConds','var')
-                                
-                                subConds{1,2}=[];
-                                subConds={subConds{1,1}};
-                                
-                                for ii=1:length(conds)
-                                    
-                                    subCond(ii).idx=contains(currDataset(i).sa.labels, ['-' conds{ii}]);
-                                    counter=1;
-                                    
-                                    for iii=1:length(subConds)
-                                        subCond(ii).idx(:,counter+1)=contains(currDataset(i).sa.labels, subConds{1,iii});
-                                        counter=counter+1;
-                                    end
-                                    
-                                    subCond(ii).idx=double(subCond(ii).idx);
-                                    subCond(ii).idx(:,counter+1)=sum(subCond(ii).idx(:,1:counter),2);
-                                    
-                                end
-                                
-                                Cond(1).idx = find(subCond(1).idx(:,counter+1) == counter);
-                                Cond(2).idx = find(subCond(2).idx(:,counter+1) == counter);
-                                
-                            else
-                                
-                                for ii=1:length(conds)
-                                    Cond(ii).labels = ~cellfun(@isempty, strfind...
-                                        (currDataset(i).sa.labels, ['-' conds{ii}]));
-                                    Cond(ii).idx = find(Cond(ii).labels == 1);
+                                        
+                                        zscoreResid = zscore(allResiduals);
+                                        currDataset.samples = zscoreResid;
+                                        
+                                        clear files curMat rtCell rtDouble model allResiduals zscoreResid;
                                 end
                                 
                             end
                             
-                        catch
-                            warning('Failure to define trial information. Set to debug mode.');
-                        end
-                    end
-                    
-                    % Parse data by task and condition
-                    counter=1;
-                    for i=1:length(currDataset)
-                        for ii=1:length(Cond)
-                            if strcmpi(task{i},'Retrieval')==1
-                                retData(ii)=currDataset(i);
-                                retData(ii).samples=retData(ii).samples(Cond(ii).idx,:);
-                                retData(ii).sa.beta_index=retData(ii).sa.beta_index(Cond(ii).idx);
-                                retData(ii).sa.chunks=retData(ii).sa.chunks(Cond(ii).idx);
-                                retData(ii).sa.fname=retData(ii).sa.fname(Cond(ii).idx);
-                                retData(ii).sa.labels=retData(ii).sa.labels(Cond(ii).idx);
-                                retData(ii).sa.targets=retData(ii).sa.targets(Cond(ii).idx);
-                                %retData(ii).sa.targets=[1:length(Cond(ii).idx)]';
-                            else
-                                encData(ii)=currDataset(i);
-                                encData(ii).samples=encData(ii).samples(Cond(ii).idx,:);
-                                encData(ii).sa.beta_index=encData(ii).sa.beta_index(Cond(ii).idx);
-                                encData(ii).sa.chunks=encData(ii).sa.chunks(Cond(ii).idx);
-                                encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).idx);
-                                encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).idx);
-                                encData(ii).sa.targets=encData(ii).sa.targets(Cond(ii).idx);
-                                %encData(ii).sa.targets=[1:length(Cond(ii).idx)]';
+                            try
+                                if exist('subConds','var')
+                                    
+                                    subConds{1,2}=[];
+                                    subConds={subConds{1,1}};
+                                    
+                                    for ii=1:length(conds)
+                                        
+                                        subCond(ii).idx=contains(currDataset(i).sa.labels, ['-' conds{ii}]);
+                                        counter=1;
+                                        
+                                        for iii=1:length(subConds)
+                                            subCond(ii).idx(:,counter+1)=contains(currDataset(i).sa.labels, subConds{1,iii});
+                                            counter=counter+1;
+                                        end
+                                        
+                                        subCond(ii).idx=double(subCond(ii).idx);
+                                        subCond(ii).idx(:,counter+1)=sum(subCond(ii).idx(:,1:counter),2);
+                                        
+                                    end
+                                    
+                                    Cond(1).idx = find(subCond(1).idx(:,counter+1) == counter);
+                                    Cond(2).idx = find(subCond(2).idx(:,counter+1) == counter);
+                                    
+                                else
+                                    
+                                    currDataset(i).sa.targets = zeros(size(currDataset(i).samples,1),1);
+                                    for ii=1:length(conds)
+                                        Cond(ii).(tasks{i}).labels = ~cellfun(@isempty, strfind...
+                                            (currDataset(i).sa.labels, conds{ii}));
+                                        Cond(ii).(tasks{i}).idx = find(Cond(ii).(tasks{i}).labels == 1);
+                                        currDataset(i).sa.targets(Cond(ii).(tasks{i}).idx) = ii;
+                                    end
+                                    
+                                end
+                                
+                            catch
+                                warning('Failure to define trial information. Set to debug mode.');
                             end
                         end
-                    end
-                    
-                    % Setup DSM and searchlight arguments
-                    %DSM
-                    dsmArgs.metric = 'correlation';
-                    dsmArgs.center_data = 1;
-                    
-                    %Searchlight
-                    searchlightSize = 20;
-                    metric = 'count';
-                    measure = @cosmo_target_dsm_corr_measure;
-                    measure_args = struct();
-                    measure_args.type = 'Spearman';
-                    measure_args.center_data = 1;
-                    
-                    
-                    for i=1:length(Cond)
                         
-                        % Create Target DSM from Encoding Run
-                        targetDSM(i) = cosmo_dissimilarity_matrix_measure(encData(i), dsmArgs);
+                        % Parse data by task and condition
+                        counter=1;
+                        for i=1:length(currDataset)
+                            for ii=1:length(Cond)
+                                switch tasks{i}
+                                    case 'Encoding'
+                                        encData(ii) = currDataset(i);
+                                        encData(ii).samples=encData(ii).samples(Cond(ii).(tasks{i}).idx,:);
+                                        encData(ii).sa.beta_index=encData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
+                                        encData(ii).sa.chunks=encData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
+                                        encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
+                                        encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
+                                        encData(ii).sa.targets=encData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
+                                    case 'Retrieval'
+                                        retData(ii) = currDataset(i);
+                                        retData(ii).samples = retData(ii).samples(Cond(ii).(tasks{i}).idx,:);
+                                        retData(ii).sa.beta_index = retData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
+                                        retData(ii).sa.chunks = retData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
+                                        retData(ii).sa.fname = retData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
+                                        retData(ii).sa.labels = retData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
+                                        retData(ii).sa.targets = retData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
+                                end
+                            end
+                        end
+                        
+                        for i=1:length(Cond)
+                            
+                            for j=1:length(Cond(i).Encoding.idx)
+                                for k=1:length(Cond(i).Retrieval.idx)
+                                    corrVal(j,k) = corr(encData(i).samples(j,:)',retData(i).samples(k,:)','Type','Pearson');
+                                end
+                            end
+                            
+                            rho.(conds{i}) = mean(mean(corrVal));
+                            clear corrVal;
+                        end
+                        
+                        clear currDataset removeVoxels encData retData
+                end
+        end
+        
+        %% Save text output of SVM Classification
+        if strcmpi(analysisType,'Searchlight')==0
+            % Create a tidyverse formatted table for final statistical analysis
+            
+            switch classType
+                case 'RSA'
+                    % create subjectid and roiid columns
+                    subjectid   = repmat(subjects(iteration), length(TrialTypeCombo(1)), 1);
+                    roiid       = repmat({regionName}, length(TrialTypeCombo(1)), 1);
+                    
+                    % create the stats table
+                    %stats_table = table...
+                    %    (subjectid, roiid, TrialTypeCombo, rho(1,2));
+                    
+                    for i=1:combinations
+                        
+                        conditions   = repmat({TrialTypeCombo(i)}, length(TrialTypeCombo(1)), 1);
+                        corrVal       = repmat({rho(i).samples}, length(TrialTypeCombo(1)), 1);
                         
                         if i==1
-                            % Create Searchlight
-                            nbrhood=cosmo_spherical_neighborhood(retData(i),metric,searchlightSize);
-                        end
-                        
-                        % Set target DSM
-                        measure_args.target_dsm = targetDSM(i).samples;
-                        
-                        % Searchlight ERS for each condition separately
-                        results(i) = cosmo_searchlight(retData(i),nbrhood,measure,measure_args);
-                        
-                    end
-                    
-                    save([outputPath '/searchlightResults_' metric '_' ...
-                        num2str(searchlightSize) '.mat'],'results');
-                    
-                    for i=1:length(conds)
-                        % Define output location
-                        if ~exist('subConds','var')
-                            output{i}=strcat(outputPath,'/',subject,...
-                                '_ERS_Searchlight_',metric,'_',...
-                                num2str(searchlightSize),'_',...
-                                conds{i},'.nii');
+                            statsTable = table(subjectid, roiid, conditions, corrVal);
+                            statsTable.Properties.VariableNames{3}=['conditions' num2str(i)];
+                            statsTable.Properties.VariableNames{4}=['corrVal' num2str(i)];
                         else
-                            output=strcat(outputPath,'/',subject,'_',...
-                                classifier.name,'_Searchlight_',metric,'_',...
-                                num2str(searchlightSize),'_',...
-                                conds{1,1},'_vs_',conds{1,2},'_',subConds{1,1},'.nii');
+                            tempTable = table(conditions, corrVal);
+                            tempTable.Properties.VariableNames{1}=['conditions' num2str(i)];
+                            tempTable.Properties.VariableNames{2}=['corrVal' num2str(i)];
+                            statsTable = [statsTable tempTable];
                         end
-                        
-                        % Store results to disk
-                        cosmo_map2fmri(results(i), output{i});
                         
                     end
                     
-                case 'ROI'
-                    %%% Loading ROI data into CosmoMVPA - use SPM betas
-                    fprintf('Loading data from ROI: %s\n',ROI);
-                    for i=1:length(tasks)
-                        
-                        spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
-                            subject '/SPM.mat'];
-                        currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
-                        
-                    end
+                    %Add in within-condition correlation
+                    statsTable = [statsTable];
                     
-                    % Remove errant voxels in both datasets
-                    for i=1:size(currDataset(1).samples,2)
-                        for j=1:length(tasks)
-                            remove(j) = isnan(currDataset(j).samples(1,i));
-                        end
-                        
-                        if sum(remove)>=1
-                            removeVoxels(i) = 1;
-                        else
-                            removeVoxels(i) = 0;
-                        end
-                    end
+                    % write the stats table
+                    filename = sprintf('sub-%s_roiid-%s_statistics-table.csv', subjectid{:}, roiid{:});
+                    writetable(statsTable, fullfile(outputPath, filename));
                     
-                    %%% Indentify trials of interest for each condition
-                    for i=1:length(tasks)
-                        currDataset(i).samples(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.i(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.j(:,logical(removeVoxels))=[];
-                        currDataset(i).fa.k(:,logical(removeVoxels))=[];
-                        
-                        % Mean center data
-                        currDataset(i).samples = bsxfun...
-                            (@minus,currDataset(i).samples,mean(currDataset(i).samples,1));
-                        
-                        if strcmpi(tasks{i},'Retrieval')==1
-                            switch regressRT.flag
-                                case 'Yes'
-                                    files = dir([study_path filesep subject filesep 'Run*']);
-                                    for j=1:length(files)
-                                        curMat(j) = load([files(j).folder filesep files(j).name]);
-                                        if j==length(files)
-                                            rtCell = [curMat.RT];
-                                            
-                                            % Convert from cell to double for regression
-                                            for k=1:length(rtCell)
-                                                
-                                                % Flag outlier RT greater than 4 seconds
-                                                if double(rtCell{k}) >= regressRT.trialSec
-                                                    rtDouble(k,1) = regressRT.trialSec;
-                                                else
-                                                    rtDouble(k,1) = double(rtCell{k});
-                                                end
-                                            end
-                                            
-                                            % Replace with trial duration (set in params)
-                                            rtDouble(isnan(rtDouble))=regressRT.trialSec;
-                                        end
-                                    end
-                                    
-                                    % Z-Score RT values
-                                    rtDouble = zscore(rtDouble);
-                                    
-                                    for jj=1:length(currDataset.samples)
-                                        model = LinearModel.fit(rtDouble,currDataset.samples(:,j));
-                                        if j==1
-                                            allResiduals = model.Residuals.Raw;
-                                        else
-                                            allResiduals = [allResiduals model.Residuals.Raw];
-                                        end
-                                    end
-                                    
-                                    zscoreResid = zscore(allResiduals);
-                                    currDataset.samples = zscoreResid;
-                                    
-                                    clear files curMat rtCell rtDouble model allResiduals zscoreResid;
-                            end
-                            
-                        end
-                        
-                        try
-                            if exist('subConds','var')
-                                
-                                subConds{1,2}=[];
-                                subConds={subConds{1,1}};
-                                
-                                for ii=1:length(conds)
-                                    
-                                    subCond(ii).idx=contains(currDataset(i).sa.labels, ['-' conds{ii}]);
-                                    counter=1;
-                                    
-                                    for iii=1:length(subConds)
-                                        subCond(ii).idx(:,counter+1)=contains(currDataset(i).sa.labels, subConds{1,iii});
-                                        counter=counter+1;
-                                    end
-                                    
-                                    subCond(ii).idx=double(subCond(ii).idx);
-                                    subCond(ii).idx(:,counter+1)=sum(subCond(ii).idx(:,1:counter),2);
-                                    
-                                end
-                                
-                                Cond(1).idx = find(subCond(1).idx(:,counter+1) == counter);
-                                Cond(2).idx = find(subCond(2).idx(:,counter+1) == counter);
-                                
-                            else
-                                
-                                currDataset(i).sa.targets = zeros(size(currDataset(i).samples,1),1);
-                                for ii=1:length(conds)
-                                    Cond(ii).(tasks{i}).labels = ~cellfun(@isempty, strfind...
-                                        (currDataset(i).sa.labels, conds{ii}));
-                                    Cond(ii).(tasks{i}).idx = find(Cond(ii).(tasks{i}).labels == 1);
-                                    currDataset(i).sa.targets(Cond(ii).(tasks{i}).idx) = ii;
-                                end
-                                
-                            end
-                            
-                        catch
-                            warning('Failure to define trial information. Set to debug mode.');
-                        end
-                    end
-                    
-                    % Parse data by task and condition
-                    counter=1;
-                    for i=1:length(currDataset)
-                        for ii=1:length(Cond)
-                            switch tasks{i}
-                                case 'Encoding'
-                                    encData(ii) = currDataset(i);
-                                    encData(ii).samples=encData(ii).samples(Cond(ii).(tasks{i}).idx,:);
-                                    encData(ii).sa.beta_index=encData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
-                                    encData(ii).sa.chunks=encData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
-                                    encData(ii).sa.fname=encData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
-                                    encData(ii).sa.labels=encData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
-                                    encData(ii).sa.targets=encData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
-                                case 'Retrieval'
-                                    retData(ii) = currDataset(i);
-                                    retData(ii).samples = retData(ii).samples(Cond(ii).(tasks{i}).idx,:);
-                                    retData(ii).sa.beta_index = retData(ii).sa.beta_index(Cond(ii).(tasks{i}).idx);
-                                    retData(ii).sa.chunks = retData(ii).sa.chunks(Cond(ii).(tasks{i}).idx);
-                                    retData(ii).sa.fname = retData(ii).sa.fname(Cond(ii).(tasks{i}).idx);
-                                    retData(ii).sa.labels = retData(ii).sa.labels(Cond(ii).(tasks{i}).idx);
-                                    retData(ii).sa.targets = retData(ii).sa.targets(Cond(ii).(tasks{i}).idx);
-                            end
-                        end
-                    end
-                    
-                    for i=1:length(Cond)
-                        
-                        for j=1:length(Cond(i).Encoding.idx)
-                           for k=1:length(Cond(i).Retrieval.idx)
-                               corrVal(j,k) = corr(encData(i).samples(j,:)',retData(i).samples(k,:)','Type','Pearson');
-                           end
-                        end
-                        
-                        rho.(conds{i}) = mean(mean(corrVal));
-                        clear corrVal;
-                    end
-                    
-                    clear currDataset removeVoxels encData retData
-            end
-    end
-    
-    %% Save text output of SVM Classification
-    if strcmpi(analysisType,'Searchlight')==0
-        % Create a tidyverse formatted table for final statistical analysis
-        
-        switch classificationType
-            case 'RSA'
-                TrialTypeCombo = {strcat(conds{1,1},'_v_',conds{1,2})};
-                
-                % create subjectid and roiid columns
-                regionName  = erase(ROI,{'reslice_','_bilat.nii'});
-                subjectid   = repmat({subject}, length(TrialTypeCombo), 1);
-                roiid       = repmat({regionName}, length(TrialTypeCombo), 1);
-                
-                % create the stats table
-                %stats_table = table...
-                %    (subjectid, roiid, TrialTypeCombo, rho(1,2));
-                stats_table = table...
-                    (subjectid, roiid, TrialTypeCombo, rho.samples);
-                
-                % write the stats table
-                filename = sprintf('sub-%s_roiid-%s_statistics-table.csv', subject, ROI);
-                writetable(stats_table, fullfile(outputPath, filename));
-            case 'ERS'
-                % Create subjectid and roiid columns
-                TrialTypeCombo = {strcat(tasks{1},'_v_',tasks{2})};
-                regionName  = erase(ROI,{'reslice_','_bilat.nii'});
-                
-                % Create final stats table for region
-                statsTable = cell(2,3+length(conds));
-                for i=1:length(conds)
-                    if i==1
-                        statsTable(1,1:3) = {'subjectid','roiid','TrialTypeCombo'};
-                        statsTable(2,1:3) = {subject, regionName, char(TrialTypeCombo)};
-                    end
-                    statsTable{1,i+3} = conds{i};
-                    statsTable{2,i+3} = rho.(conds{i});
-                end
-                
-                % Write output summary file
-                file = fopen([sprintf([outputPath '/'...
-                    'sub-%s_roiid-%s_statistics-table.csv'], subject, regionName)], 'w');
-                
-                for a=1:size(statsTable,1)
-                    for b=1:size(statsTable,2)
-                        var = eval('statsTable{a,b}');
-                        try
-                            fprintf(file, '%s', var);
-                        end
-                        fprintf(file, ',');
-                    end
-                    fprintf(file, '\n');
-                end
-                fclose(file);
-        end
-        
-        %% Create aggregate table for easy viewing
-        % Create headers
-        if iteration==1
-            
-            switch classificationType
-                case 'RSA'
-                    finalTable=cell(length(subjects)+1,length(rois)+2);
-                    finalTable{1,1}='subjectid';
-                    finalTable{1,2}='Trial Type';
-                    tempcount=3;
-                    
-                    for header=1:length(rois)
-                        finalTable{1,tempcount}=strcat(...
-                            rois{1,header}(1:end-4),'_Similarity');
-                        tempcount=tempcount+1;
-                    end
                 case 'ERS'
-                    finalTable=cell(length(subjects)+1,length(rois)*2+2);
-                    finalTable{1,1}='subjectid';
-                    finalTable{1,2}='Trial Type';
-                    tempcount=3;
+                    % Create subjectid and roiid columns
+                    TrialTypeCombo = {strcat(tasks{1},'_v_',tasks{2})};
+                    regionName  = erase(ROI,{'reslice_','_bilat.nii'});
                     
-                    for header=1:length(rois)
-                        finalTable{1,tempcount}=strcat(...
-                            rois{1,header}(1:end-4),'_',conds{1},'_Similarity');
-                        finalTable{1,tempcount+1}=strcat(...
-                            rois{1,header}(1:end-4),'_',conds{2},'_Similarity');
-                        tempcount=tempcount+2;
+                    % Create final stats table for region
+                    statsTable = cell(2,3+length(conds));
+                    for i=1:length(conds)
+                        if i==1
+                            statsTable(1,1:3) = {'subjectid','roiid','TrialTypeCombo'};
+                            statsTable(2,1:3) = {subject, regionName, char(TrialTypeCombo)};
+                        end
+                        statsTable{1,i+3} = conds{i};
+                        statsTable{2,i+3} = rho.(conds{i});
                     end
+                    
+                    % Write output summary file
+                    file = fopen([sprintf([outputPath '/'...
+                        'sub-%s_roiid-%s_statistics-table.csv'], subject, regionName)], 'w');
+                    
+                    for a=1:size(statsTable,1)
+                        for b=1:size(statsTable,2)
+                            var = eval('statsTable{a,b}');
+                            try
+                                fprintf(file, '%s', var);
+                            end
+                            fprintf(file, ',');
+                        end
+                        fprintf(file, '\n');
+                    end
+                    fclose(file);
             end
             
-            finalTable{1,tempcount}=['num' conds{1}];
-            finalTable{1,tempcount+1}=['num' conds{2}];
+            %% Create aggregate table for easy viewing
+            % Create headers
+            if iteration==1 && curMask==1
+                
+                switch classType
+                    case 'RSA'
+                        summary=cell(length(subjects)+1,length(masks)+2);
+                        summary{1,1}='subjectid';
+                        summary{1,2}='Trial Type';
+                        tmpCnt=3;
+                        
+                        for header=1:length(masks)
+                            summary{1,tmpCnt}=[masks(header).name(1:end-7)...
+                                '_Similarity'];
+                            tmpCnt=tmpCnt+1;
+                        end
+                    case 'ERS'
+                        summary=cell(length(subjects)+1,length(masks)*2+2);
+                        summary{1,1}='subjectid';
+                        summary{1,2}='Trial Type';
+                        tmpCnt=3;
+                        
+                        for header=1:length(masks)
+                            summary{1,tmpCnt}=strcat(masks(header).name(1:end-7),...
+                                '_',taskInfo.Conditions{1},'_Similarity');
+                            summary{1,tmpCnt+1}=strcat(masks(header).name(1:end-7),...
+                                '_',taskInfo.Conditions{2},'_Similarity');
+                            tmpCnt=tmpCnt+2;
+                        end
+                end
+                
+                summary{1,tmpCnt}=['num_' taskInfo.Conditions{1}];
+                summary{1,tmpCnt+1}=['num_' taskInfo.Conditions{2}];
+                
+                row=2;
+                header=3;
+                clear tmpCnt;
+            end
             
-            row=2;
-            header=3;
-            clear tempcount;
+            % Counter for resetting to next row. Uses remainder from divison of
+            % region counter over total (e.g. 1/14) to check data should be
+            % read into next subject line/row.
+            iterCheck=mod(curMask,length(masks));
+            
+            % Add subject, trial type, and accuracy to table
+            summary{row,1}=subjects{iteration};
+            summary{row,2}=TrialTypeCombo{1,1};
+            switch classType
+                case 'RSA'
+                    summary{row,header}=rho.samples;
+                    header=header+1;
+                case 'ERS'
+                    summary{row,header}=rho.(taskInfo.Conditions{1});
+                    summary{row,header+1}=rho.(taskInfo.Conditions{2});
+                    header=header+2;
+            end
+            
+            % Drops to next row if remainder is 0 (e.g. all regions have been
+            % entered for a given subject)
+            if iterCheck == 0
+                switch classType
+                    case 'RSA'
+                        summary{row,header}=num2str(length(Cond(1).idx));
+                        summary{row,header+1}=num2str(length(Cond(2).idx));
+                    case 'ERS'
+                        summary{row,header}=num2str(length(Cond(1).(tasks{i}).idx));
+                        summary{row,header+1}=num2str(length(Cond(2).(tasks{i}).idx));
+                end
+                row=row+1;
+                header=3;
+            end
+            
         end
-        
-        % Counter for resetting to next row. Uses remainder from divison of
-        % region counter over total (e.g. 1/14) to check data should be
-        % read into next subject line/row.
-        iterCheck=mod(iteration,length(rois));
-        
-        % Add subject, trial type, and accuracy to table
-        finalTable{row,1}=subject;
-        finalTable{row,2}=TrialTypeCombo{1,1};
-        switch classificationType
-            case 'RSA'
-                finalTable{row,header}=rho.samples;
-                header=header+1;
-            case 'ERS'
-                finalTable{row,header}=rho.(conds{1});
-                finalTable{row,header+1}=rho.(conds{2});
-                header=header+2;
-        end
-        
-        % Drops to next row if remainder is 0 (e.g. all regions have been
-        % entered for a given subject)
-        if iterCheck == 0
-            finalTable{row,header}=num2str(length(Cond(1).(tasks{i}).idx));
-            finalTable{row,header+1}=num2str(length(Cond(2).(tasks{i}).idx));
-            row=row+1;
-            header=3;
-        end
-        
     end
 end
 
 % Save mat file with statistics separately
-save([out_path '_' classificationType filesep 'finalTable.mat'],'finalTable');
+save([fileparts(outputPath) filesep 'summary.mat'],'summary');
 
 %% Save summary files of RSA.
 if strcmpi(analysisType,'Searchlight')==0
     
     % Write output summary file
-    file = fopen([out_path '_' classificationType filesep 'allAccuraciesSummary.csv'], 'w');
+    file = fopen([fileparts(outputPath) filesep 'allSimilaritiesSummary.csv'], 'w');
     
-    for a=1:size(finalTable,1)
-        for b=1:size(finalTable,2)
-            var = eval('finalTable{a,b}');
+    for a=1:size(summary,1)
+        for b=1:size(summary,2)
+            var = eval('summary{a,b}');
             try
                 fprintf(file, '%s', var);
             end
@@ -813,5 +839,6 @@ if strcmpi(analysisType,'Searchlight')==0
     end
     
     fclose(file);
+    clc;
     clear;
 end
