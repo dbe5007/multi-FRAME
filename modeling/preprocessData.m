@@ -42,7 +42,7 @@ end
 %% Initial Path & File Setup
 
 switch preprocPipeline
-    case 'SPM12'
+    case 'spm12'
         
         % Add SPM12 to path
         addpath('/directory/to/spm12');
@@ -65,7 +65,7 @@ switch preprocPipeline
         directories.psfiles = [processDir '/psfiles'];
         !mkdir -p $processDir/psfiles;
         
-    case 'fMRIPrep'
+    case 'fmriprep'
         dataDir = [directory.Project '/preprocessing/fmriprep'];
 end
 

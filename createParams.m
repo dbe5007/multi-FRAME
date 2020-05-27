@@ -125,7 +125,7 @@ try
     Mask.name = 'name_of_mask.nii';
     
     switch preprocPipeline
-        case 'spm23'
+        case 'spm12'
             Func.dir         = [directory.Project filesep rawData.funcDir];
             Func.wildcard    = '^ar.*\.nii'; % File
             taskInfo.Slices = inputdlg('How many slices [# of slices in volume]?',...
@@ -185,27 +185,24 @@ end
 try
     % Bootstrapping Setup
     
-    if exist('commandFlag','var')==0
-        bootstrap.flag  = questdlg('Perform Bootstrap',...
-            'Confirm Bootstrap',...
-            'Yes','No','Cancel','No');
+    bootstrap.flag  = questdlg('Perform Bootstrap',...
+        'Confirm Bootstrap',...
+        'Yes','No','Cancel','No');
+    
+    if strcmpi(bootstrap.flag,'Yes')==1
+        bootstrap.numRuns     = taskInfo.Runs;
+        bootstrap.numTrials   = taskInfo.Trials;
+        bootstrap.perm        = inputdlg('How many permutations?',...
+            'Permutation Number',[1 35],{'1000'});
+        bootstrap.perm = str2double(bootstrap.perm{:});
         
-        if strcmpi(bootstrap.flag,'Yes')==1
-            bootstrap.numRuns     = taskInfo.Runs;
-            bootstrap.numTrials   = taskInfo.Trials;
-            bootstrap.perm        = inputdlg('How many permutations?',...
-                'Permutation Number',[1 35],{'1000'});
-            bootstrap.perm = str2double(bootstrap.perm{:});
-            
-            bootstrap.trialsPerRun = randperm(length...
-                (1:bootstrap.numTrials));
-            
-            for i=1:bootstrap.numRuns
-                bootstrap.structNames{i} = ['perm' num2str(i)];
-            end
+        bootstrap.trialsPerRun = randperm(length...
+            (1:bootstrap.numTrials));
+        
+        for i=1:bootstrap.numRuns
+            bootstrap.structNames{i} = ['perm' num2str(i)];
         end
     end
-    
     switch classType
         % MVPA Flags
         case 'MVPA'

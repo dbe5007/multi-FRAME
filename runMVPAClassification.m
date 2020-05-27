@@ -56,22 +56,11 @@ parentDir = directory.Model;
 % Base output directory name
 analysis = [directory.Analysis filesep 'models' filesep file(1:end-4)];
 
+%Debug
+subjects(2)=[];
+
 %% Main Body
 for iteration=1:length(subjects)
-    
-    % Loop count for all subject/region combinations
-    %     if iteration==1
-    %         subjCount=1;
-    %         regionCount=1;
-    %     elseif mod(iteration,length(rois))==mod(1,length(rois))
-    %         subjCount=subjCount+1;
-    %         regionCount=1;
-    %     elseif mod(iteration,length(rois))>=0
-    %         regionCount=regionCount+1;
-    %     end
-    
-    %     subject = subjects{subjCount};
-    %     ROI     = rois{regionCount};
     
     %% Subject-Specific Directories
     
@@ -94,8 +83,8 @@ for iteration=1:length(subjects)
         filesep subjects{iteration} filesep '*.nii.gz']);
     
     %Debug
-    masks=masks(1:3);
-    bootstrap.perm = 100;
+    masks=masks(9:13);
+    bootstrap.perm = 500;
     
     for curMask = 1:length(masks)
         
@@ -413,15 +402,15 @@ for iteration=1:length(subjects)
                             
                             currPermute = permutation(i);
                             
-                            % Unequal Trial Check
-                            for j=1:taskInfo.Runs
-                                if length(partitions.test_indices{j}) ~= length(permutation(i).(['perm' num2str(j)]))
-                                    [~,I] = max(permutation(i).(['perm' num2str(j)]));
-                                    permutation(i).(['perm' num2str(j)])(I)=[];
-                                    [~,I] = max(permutation(i).(['perm' num2str(j)]));
-                                    permutation(i).(['perm' num2str(j)])(I)=[];
-                                end
-                            end
+                            % Unequal Trial Check  %%% IN PROGRESS %%%
+%                             for j=1:taskInfo.Runs
+%                                 if length(partitions.test_indices{j}) ~= length(permutation(i).(['perm' num2str(j)]))
+%                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
+%                                     permutation(i).(['perm' num2str(j)])(I)=[];
+%                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
+%                                     permutation(i).(['perm' num2str(j)])(I)=[];
+%                                 end
+%                             end
                             
                             try
                                 [predictions, accuracy] = ...
@@ -627,7 +616,12 @@ try
         
         for i=1:size(temp,1)
             for ii=1:size(temp,2)
-                tempDouble(i,ii)=double(temp{i,ii});
+                if isnumeric(temp{i,ii})==0
+                    %tempDouble(i,ii)=double(temp{i,ii});
+                    tempDouble(i,ii)=str2double(temp{i,ii});
+                else
+                    tempDouble(i,ii)=temp{i,ii};
+                end
             end
         end
         
@@ -678,40 +672,38 @@ try
                 %% Compare True Accuracy to Permutation Classification
                 criticalCutoff = mean(tempDouble);
                 
-                for i=1:length(masks)
+                for i=1:length(subjects)
+                    files = dir([fileparts(outputPath) '/' subjects{i} '/*permutedAcc.mat']);
                     
-                    % Create aggregate table of classification
-                    if i==1
-                        finalTableBootstrap=cell(4,length(masks)+1);
-                        finalTableBootstrap{2,1}='True Accuracy';
-                        finalTableBootstrap{3,1}='Permutations greater than True Accuracy';
-                        finalTableBootstrap{4,1}='Bootstrap p value';
-                        tmpCnt=2;
+                    for j=1:length(files)
                         
-                        for header=1:length(rois)
-                            finalTableBootstrap{1,tmpCnt}=strcat...
-                                (masks{1,header}(1:end-4),'_Accuracy');
-                            tmpCnt=tmpCnt+1;
+                        % Create aggregate table of classification
+                        if i==1 && j==1
+                            finalTableBootstrap=cell(4,length(files)+1);
+                            finalTableBootstrap{2,1}='True Accuracy';
+                            finalTableBootstrap{3,1}='Permutations greater than True Accuracy';
+                            finalTableBootstrap{4,1}='Bootstrap p value';
+                            tmpCnt=2;
+                        
+                            for header=1:length(masks)
+                                finalTableBootstrap{1,tmpCnt}=strcat...
+                                    (files(header).name(1:end-7),'_classAcc');
+                                tmpCnt=tmpCnt+1;
+                            end
+                        
+                            row=2;
+                            header=3;
+                            clear tempcount;
+                            
                         end
                         
-                        row=2;
-                        header=3;
-                        clear tempcount;
-                    end
-                    
-                    % Aggregate final accuracies for all permuatations for all subjects
-                    for j=1:length(subjects)
-                        
-                        file = dir([fileparts(outputPath) '/' subjects{j} '/' rois{i} '*']);
-                        load([file.folder '/' file.name]);
-                        
+                        % Aggregate final accuracies for all permuatations for all subjects
+                        load([files(j).folder '/' files(j).name]);
                         tempROI(:,j) = finalAcc;
-                        
                         clear finalAcc;
                         
                     end
                     
-                    % Average all accuracies per permutation and sort descending
                     avgAcc = mean(tempROI,2);
                     avgAcc = sort(avgAcc,'descend');
                     
@@ -731,6 +723,7 @@ try
                     clear avgAcc counter;
                     
                 end
+                
         end
         
         
@@ -790,6 +783,7 @@ try
                 end
                 fclose(file);
         end
+        clc;
         clear;
     end
 end
