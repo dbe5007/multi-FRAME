@@ -1,4 +1,4 @@
-```{r, message=FALSE, warning = FALSE, echo = FALSE}
+#```{r, message=FALSE, warning = FALSE, echo = FALSE}
 ## Setup
 
 #Load Packages and Read in Subject CSV files
@@ -12,7 +12,8 @@ library(grid)
 library(gridExtra)
 
 # Get list of region CSV files
-filelist = list.files(path = dataPath[1], recursive = TRUE, pattern = "table.csv", full.names = TRUE)
+#filelist = list.files(path = dataPath[1], recursive = TRUE, pattern = "table.csv", full.names = TRUE)
+filelist = list.files(path = '/gpfs/group/nad12/default/nad12/ICEE/ICEE_Github_Test/multivariate/models/params_fMRIPrep_enc_MVPA_ROI_II_IC_subConds_No_Bootstrap_No', recursive = TRUE, pattern = "table.csv", full.names = TRUE)
 
 # Creates list of variables, comma separated with a header  
 datalist = lapply(filelist, function(x)read.table(x, header=T, sep = ",")) 
@@ -44,15 +45,15 @@ classAccuraciesCov<-classAccuracies %>%                    #Create table named c
 classAccuraciesPlot = classAccuraciesCov[,c(1:5,7)]
 colnames(classAccuraciesPlot) <- c("regionID", "avgClassAcc", "t-stat","pVal","N","maxAcc")
 grid.table(classAccuraciesPlot)
-```
-Statistics Table
+#```
+#Statistics Table
 
-```{r, message=FALSE, warning = FALSE, fig.align = 'center', echo = FALSE}
+#```{r, message=FALSE, warning = FALSE, fig.align = 'center', echo = FALSE}
 grid.table(classAccuraciesPlot)
-```
-Graph of Classification Accuracy
+#```
+#Graph of Classification Accuracy
 
-```{r, message=FALSE, warning = FALSE, fig.align = 'center', echo = FALSE}
+#```{r, message=FALSE, warning = FALSE, fig.align = 'center', echo = FALSE}
 ##Figure 
 #Plot Group Accuracies with SEM
 classAccuracies %>%
@@ -66,4 +67,4 @@ classAccuracies %>%
   ggtitle(paste("Classification Accuracy For ", classAccuracies$TrialTypeCombo[1], sep="")) + 
   ylab("Classification Accuracy") + 
   geom_hline(yintercept=c(.5), linetype="dotted")
-```
+#```
