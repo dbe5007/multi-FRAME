@@ -100,11 +100,13 @@ Dennis, N. A., & Overman, A. A., Gerver, C. R., McGraw, K., Rowley, M. A., & Sal
 Gerver, C. R., Overman, A. A., Babu, H. J., Hultman, C. E., & Dennis, N. A. (in press). *Examining the neural basis of congruent and incongruent configural contexts during associative retrieval.* Journal of Cognitive Neuroscience.
 
 ### Presentations
-Elbich, D., Adams, R.B., Kveraga, K., Dennis, N.A. (May, 2020). *Discriminability of Neural Patterns within the Magnocellular and Parvocellular Visual Pathways.* Poster presented at the Cognitive Neuroscience Society Conference, Boston, Massachusetts.
+Elbich, D., Adams, R.B., Kveraga, K., & Dennis, N.A. (May, 2020). *Discriminability of Neural Patterns within the Magnocellular and Parvocellular Visual Pathways.* Poster presented at the Cognitive Neuroscience Society Conference, Boston, Massachusetts.
 
-Chamberlain, J. D., Turney, I. C., Dennis, N. A., (May, 2020). *Neural Discriminability Increases in Older Adults Following Cognitive Training to Reduce False Memories.* Accepted to be presented at the annual Cognitive Aging Conference, Atlanta, GA (Postponed)
+Chamberlain, J. D., Turney, I. C., & Dennis, N. A. (May, 2020). *Neural Discriminability Increases in Older Adults Following Cognitive Training to Reduce False Memories.* Accepted to be presented at the annual Cognitive Aging Conference, Atlanta, GA (Postponed)
 
-Chamberlain, J. D., Turney, I. C., Dennis, N. A., (May, 2020). *Encoding-Retrieval Similarity (ERS) of Perceptually Related Items and Their Relation to False Memories in Aging.* Presented at the Cognitive Neuroscience Society’s Virtual Annual Meeting, Boston, MA
+Chamberlain, J. D., Turney, I. C., & Dennis, N. A. (May, 2020). *Encoding-Retrieval Similarity (ERS) of Perceptually Related Items and Their Relation to False Memories in Aging.* Presented at the Cognitive Neuroscience Society’s Virtual Annual Meeting, Boston, MA
  
-Chamberlain, J. D., Hultman, C., Martinez, V., Carpenter, C., Overman, A., Dennis, N., (March, 2019). *Configuration Manipulation Impacts Neural Patterns in Medial Temporal Lobe in Associative Memory Retrieval.* Presented at the Cognitive Neuroscience Society’s Annual Meeting, San Francisco, CA
+Chamberlain, J. D., Hultman, C., Martinez, V., Carpenter, C., Overman, A., & Dennis, N. (March, 2019). *Configuration Manipulation Impacts Neural Patterns in Medial Temporal Lobe in Associative Memory Retrieval.* Presented at the Cognitive Neuroscience Society’s Annual Meeting, San Francisco, CA
+
+Gerver, C. R., Overman, A. A., Cowan, J., Jenkins, C., & Dennis, N. A. (March, 2019) *Encoding-retrieval congruency affects the neural processing of associative recollection in older adults.* Accepted to be presented at the annual Cognitive Aging Conference, Dallas, TX
 
