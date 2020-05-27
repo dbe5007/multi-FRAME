@@ -46,7 +46,7 @@ switch preprocPipeline
     case 'spm12'
         
         % Set data directories
-        processDir = [directory.Project '/derivatives/spmPreprocessing'];
+        processDir = [directory.Project '/preprocessing/spmPreprocessing'];
         setenv('dataDir',rawData.funcDir);
         setenv('processDir',processDir);
         
@@ -236,13 +236,11 @@ switch preprocPipeline
                         end
                         
                         matlabbatch{i}.spm.temporal.st.scans = images.reslice;
-                        matlabbatch{i}.spm.temporal.st.nslices  = 58;
+                        matlabbatch{i}.spm.temporal.st.nslices  = taskInfo.Slices;
                         matlabbatch{i}.spm.temporal.st.tr       = Model.TR;
                         matlabbatch{i}.spm.temporal.st.ta       = Model.TR-(Model.TR/58);
-                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:58 1:2:58];   %Even slices collected 1st, then odds; start foot to head
-                        matlabbatch{i}.spm.temporal.st.so       = [1:2:42 2:2:42];   %Odd slices collected 1st, then odds; start foot to head
-                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:dataInfo.Slices 1:2:dataInfo.Slices];   %Even slices collected 1st, then odds; start foot to head
-                        %matlabbatch{i}.spm.temporal.st.so       = [1:2:dataInfo.Slices 2:2:dataInfo.Slices];   %Odd slices collected 1st, then odds; start foot to head
+                        matlabbatch{i}.spm.temporal.st.so       = [1:2:taskInfo.Slices 2:2:taskInfo.Slices];   %Odd slices collected 1st, then odds; start foot to head
+                        %matlabbatch{i}.spm.temporal.st.so       = [2:2:taskInfo.Slices 1:2:taskInfo.Slices];   %Even slices collected 1st, then odds; start foot to head
                         matlabbatch{i}.spm.temporal.st.refslice = 2;
                         matlabbatch{i}.spm.temporal.st.prefix   = 'a';
                         
@@ -335,8 +333,7 @@ switch preprocPipeline
                         matlabbatch{i}.spm.spatial.normalise.estwrite.subj.resample = images.norm;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
-                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'TPM.nii'};
-                        %matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'/gpfs/group/nad12/default/nad12/spm12/tpm/TPM.nii'};
+                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {which('TPM.nii')};
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.affreg = 'mni';
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.reg = [0 0.001 0.5 0.05 0.2];
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.fwhm = 0;
@@ -380,7 +377,7 @@ switch preprocPipeline
             setenv('outputDir',[directory.Model filesep subjects{csub}]);
             !mkdir -p $outputDir
             
-            for j=1:dataInfo.Runs
+            for j=1:taskInfo.Runs
                 copyMotion = ['cp -p $processDir/$subject/func/run' num2str(j)...
                     '/rp* $outputDir/$subject"_task-' taskInfo.Name '_run_'...
                     num2str(j) '_motionRegressors.txt"'];
