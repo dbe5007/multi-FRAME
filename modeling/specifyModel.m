@@ -24,18 +24,14 @@
 %   5/6/19 - Number of trials, durations, and onsets saved as csv file for
 %   data QA.
 
-%% Parameter Setup
-
-%==========================================================================
-%                           User Input
-%==========================================================================
-
-% Set Analysis Parameters & Paths
-% Load subjects, paths, and condition flags
-if exist('flag','var')==0
+%% Set Analysis Parameters & Paths
+% Load all relevent project information
+if exist('flag','var') == 0
     
-    %Select parameter file interactively when running from MATLAB
-    uiopen('*.mat')
+    %Select parameter file is flag does not exist
+    [file,path]=uigetfile('*.mat','Select params file');
+    filename=fullfile(path,file);
+    load(filename);
     
 end
 
@@ -44,11 +40,11 @@ for i = 1:length(subjects)
     
     % Creates path to the current subjects behavioral file
     curSubj.behavDir  = [directory.Project filesep rawData.behavDir filesep...
-        subjects{i} filesep 'behav'];
+        subjects{i} filesep 'func'];
     curSubj.behavFile = dir([curSubj.behavDir filesep ...
-        '*' taskName '*.' rawData.behavFile]);
+        '*' taskInfo.Name '*.' rawData.behavFile]);
     
-    if length(length(curSubj.behavFile))==1
+    if length(curSubj.behavFile)==1
         % Reads in the subjects behavioral data using the readtable command.
         % See readtable for more details.
         fprintf('Reading in subject %s behavioral data ...\n', subjects{i});
@@ -71,13 +67,14 @@ for i = 1:length(subjects)
     fprintf('Sorting Behavioral Data...\n\n')
     
     % Build the multiple conditions *.mat file for each run
-    for curRun = 1:dataInfo.Runs
+    for curRun = 1:taskInfo.Runs
         
-        if length(length(curSubj.behavFile))>1
+        if length(curSubj.behavFile)>1
             % Reads in the subjects behavioral data using the readtable command.
             % See readtable for more details.
             fprintf('Reading in subject %s behavioral data ...\n', subjects{i});
-            BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name]);
+            BehavData = readtable([curSubj.behavDir filesep ...
+                curSubj.behavFile(curRun).name]);
             
             % Clean up variable names
             BehavData.Properties.VariableNames = regexprep(regexprep...
@@ -92,23 +89,19 @@ for i = 1:length(subjects)
         onsets = num2cell(BehavData.Onset(BehavData.Run == curRun)/1000)';
         
         % Set trial duration to zero for each trial, a stick function
-        number_of_trials = length(onsets);  % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
-        durations        = num2cell(zeros(1,number_of_trials));
-        %durations        = num2cell(zeros(1,dataInfo.Trials));
+        numTrials = length(onsets);
+        durations = num2cell(zeros(1,numTrials));
         
         % Initialize cell of trial names
         currRunIDs = find(BehavData.Run == curRun);
-        names   = cell(1,number_of_trials); % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
-        %names   = cell(1,dataInfo.Trials);
+        names = cell(1,numTrials);
         
         % Loop over all the trials in current run
-        for ii = 1:number_of_trials % CAN DELETE ONE TRIAL NUMBER FROM CREATE PARAMS
-            % for ii = 1:dataInfo.Trials
+        for ii = 1:numTrials
             
-            names{ii} = sprintf('trial-%s_condition-%s_retType-%s_dmScore-%s',...
+            names{ii} = sprintf('trial-%s_condition-%s',...
                 char(num2str(currRunIDs(ii))),...
-                char(BehavData.EncodingCond(currRunIDs(ii))),...
-                'Hit', char(BehavData.DMscore(currRunIDs(ii))));
+                char(BehavData.Condition(currRunIDs(ii))));
             
         end
         
@@ -155,7 +148,7 @@ end
 
 %% Write output summary file
 
-file = fopen([directory.Model filesep 'allTrialsSummary.csv'], 'w');
+file = fopen([directory.Model filesep 'fullTrialCountQC.csv'], 'w');
 
 for a=1:size(finalSummary,1)
     for b=1:size(finalSummary,2)

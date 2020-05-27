@@ -28,13 +28,14 @@
 % preprocessing. This is performed to protect integrity of raw data and
 % prevent overwriting.
 
-% Set Analysis Parameters & Paths
-% Load subject IDs, ROIs, and Condition flags
-
+%% Set Analysis Parameters & Paths
+% Load all relevent project information
 if exist('flag','var') == 0
     
     %Select parameter file is flag does not exist
-    uiopen('*.mat')
+    [file,path]=uigetfile('*.mat','Select params file');
+    filename=fullfile(path,file);
+    load(filename);
     
 end
 
@@ -44,9 +45,7 @@ end
 switch preprocPipeline
     case 'spm12'
         
-        % Add SPM12 to path
-        addpath('/directory/to/spm12');
-        %dataDir = rawData.funcDir;
+        % Set data directories
         processDir = [directory.Project '/derivatives/spmPreprocessing'];
         setenv('dataDir',rawData.funcDir);
         setenv('processDir',processDir);
@@ -146,7 +145,7 @@ end
 %% Main Code
 
 switch preprocPipeline
-    case 'SPM12'
+    case 'spm12'
         % Initialize SPM
         spm('defaults', 'FMRI'); % load SPM default options
         spm_jobman('initcfg')    % Configure the SPM job manger
@@ -173,7 +172,7 @@ switch preprocPipeline
             % Copy & unzip functionals
             !mkdir -p $processDir/$subject/func
             
-            copyTaskRun = ['cp $dataDir/$subject/func/*' taskName ...
+            copyTaskRun = ['cp $dataDir/$subject/func/*' taskInfo.Name ...
                 '*nii.gz $processDir/$subject/func'];
             system(copyTaskRun);
             
@@ -181,7 +180,7 @@ switch preprocPipeline
             !gunzip $processDir/$subject/func/sub*
             
             % Create separate directories for each run
-            for i=1:dataInfo.Runs
+            for i=1:taskInfo.Runs
                 makeRunDir = ['mkdir -p $processDir/$subject/func/run' num2str(i)];
                 system(makeRunDir);
                 
@@ -271,7 +270,7 @@ switch preprocPipeline
                         
                         for a=1:length(runs)
                             images.slicetime{a,1} = [runs{a} '/ar' subjects{csub} ...
-                                '_task-' taskName '_run-' num2str(a) '_bold.nii'];
+                                '_task-' taskInfo.Name '_run-' num2str(a) '_bold.nii'];
                         end
                         
                         matlabbatch{i}.spm.spatial.coreg.estimate.other = images.slicetime;
@@ -336,8 +335,8 @@ switch preprocPipeline
                         matlabbatch{i}.spm.spatial.normalise.estwrite.subj.resample = images.norm;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
-                        %matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'path/to/spm12/tpm/TPM.nii'};
-                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'/gpfs/group/nad12/default/nad12/spm12/tpm/TPM.nii'};
+                        matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'TPM.nii'};
+                        %matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.tpm = {'/gpfs/group/nad12/default/nad12/spm12/tpm/TPM.nii'};
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.affreg = 'mni';
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.reg = [0 0.001 0.5 0.05 0.2];
                         matlabbatch{i}.spm.spatial.normalise.estwrite.eoptions.fwhm = 0;
@@ -383,7 +382,7 @@ switch preprocPipeline
             
             for j=1:dataInfo.Runs
                 copyMotion = ['cp -p $processDir/$subject/func/run' num2str(j)...
-                    '/rp* $outputDir/$subject"_task-' taskName '_run_'...
+                    '/rp* $outputDir/$subject"_task-' taskInfo.Name '_run_'...
                     num2str(j) '_motionRegressors.txt"'];
                 system(copyMotion);
             end
@@ -417,13 +416,13 @@ switch preprocPipeline
             
         end
         
-    case 'fMRIPrep'
+    case 'fmriprep'
         
         for i=1:length(subfolders)
             
             % Read covariates file
             tsvFiles = dir([dataDir '/' subfolders(i).name '/func/*' ...
-                taskName '*confound*.tsv']);
+                taskInfo.Name '*confound*.tsv']);
             
             if length(tsvFiles)~=0
                 % Make output folder

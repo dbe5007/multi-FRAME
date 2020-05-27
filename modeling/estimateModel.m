@@ -8,21 +8,14 @@
 %
 % See also:  SpecifyModel, createParams
 
-%% User Input
-% You should ONLY (!!!!!!) need to edit this highlighted section of the
-% script.
-
-% Add SPM12 to path
-addpath(genpath('/path/to/spm12folder'));
-
-% User Input Step 1: Analysis, Funcs, and Masks
-
-% Set Analysis Parameters & Paths
-% Load subject IDs, ROIs, and Condition flags
+%% Set Analysis Parameters & Paths
+% Load all relevent project information
 if exist('flag','var') == 0
     
     %Select parameter file is flag does not exist
-    uiopen('*.mat')
+    [file,path]=uigetfile('*.mat','Select params file');
+    filename=fullfile(path,file);
+    load(filename);
     
 end
 
@@ -38,9 +31,9 @@ jobman_option = 'run'; % interactive = show in GUI, run = run through SPM
 
 %% Routine
 
-clc
 spm('Defaults','FMRI')
 spm_jobman('initcfg')
+clc;
 
 for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     
@@ -70,18 +63,18 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     
     % Get directory of motion files
     motionFiles = dir(fullfile(directory.Model, subjects{curSub},...
-                ['*' taskName '*.txt']));
+                ['*' taskInfo.Name '*.txt']));
     
     switch preprocPipeline
-        case 'SPM12'
+        case 'spm12'
             
             procDataDir = fullfile(directory.Project, 'derivatives',...
                 'spmPreprocessing');
             
             procFuncFiles = dir(fullfile(procDataDir, subjects{curSub},...
-                'func', 'run*',['ar*' taskName '*.nii.gz']));
+                'func', 'run*',['ar*' taskInfo.Name '*.nii.gz']));
             
-            for i = 1:NumOfRuns
+            for i = 1:taskInfo.Runs
                 % Gunzip functional file
                 
                 setenv('modelData',[procFuncFiles(i).folder filesep procFuncFiles(i).name]);
@@ -99,12 +92,13 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
             end
             
             
-        case 'fMRIPrep'
+        case 'fmriprep'
             
             procFuncFiles = dir(fullfile(directory.Project, 'preprocessing',...
-                'fmriprep', subjects{curSub}, 'func', ['*' taskName '*_bold.nii.gz']));
+                'fmriprep', subjects{curSub}, 'func', ...
+                ['*' taskInfo.Name '*_bold.nii.gz']));
             
-            for i = 1:NumOfRuns
+            for i = 1:taskInfo.Runs
                 curFuncDir = fullfile(directory.Project, 'preprocessing',...
                     'fmriprep', subjects{curSub}, 'func');
                 
@@ -219,7 +213,7 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     
     %% Manage resulting files
     switch preprocPipeline
-        case 'SPM12'
+        case 'spm12'
             % Set Gzip directories
             subjFuncDir = fullfile(directory.Model, subjects{curSub});
             setenv('procDataDir',[procDataDir filesep subjects{curSub}]);
@@ -229,7 +223,7 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
             !gzip $subjFuncDir/*.nii
             !gzip $procDataDir/func/*/*.nii
             
-        case 'fMRIPrep'
+        case 'fmriprep'
             % Remove copied functional data from model directory
             !rm $dest/*_bold.nii
             

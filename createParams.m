@@ -68,14 +68,10 @@ rawData.behavFile = inputdlg('Enter Trial Tag File Extension:',...
     'File extension',[1 35],{'e.g. xlsx, csv'});
 rawData.behavFile = rawData.behavFile{:};
 
-%  Functional Data Preprocessing Program
-if exist('commandFlag','var')==0
-    preprocPipeline = questdlg('Select Preprocessing Pipeline',...
-        'Confirm Pipeline',...
-        'spm12','fmriprep','Cancel','fmriprep');
-else
-    preprocPipeline = 'fmriprep';
-end
+% Functional Data Preprocessing Program
+preprocPipeline = questdlg('Select Preprocessing Pipeline',...
+    'Confirm Pipeline',...
+    'spm12','fmriprep','Cancel','fmriprep');
 
 %% Task and Data Information
 
@@ -132,7 +128,7 @@ try
                 'Number of Slices',[1 35],{'50'});
             taskInfo.Slices = str2double(taskInfo.Slices{:});
             
-        case 'fmrirep'
+        case 'fmriprep'
             Func.dir         = [directory.Project filesep rawData.funcDir];
             Func.wildcard    = ['^*' taskInfo.Name '_run-']; % File
             
@@ -143,6 +139,7 @@ catch
 end
 
 %% Project Paths
+
 try
     % General path setup
     directory.Analysis = [directory.Project filesep 'multivariate'];
@@ -167,15 +164,6 @@ try
     regressRT.flag = questdlg('Regress out Reaction Time (RT)?',...
         'Confirm Regression',...
         'Yes','No','Cancel','No');
-    
-    switch analysisType
-        case 'Searchlight'
-            roiPath     = [directory.Project 'ROIs/searchlight'];
-            searchlight = 'Yes';
-        otherwise
-            roiPath     = '/path/to/common/mask/folder';
-            searchlight = 'No';
-    end
 catch
     error('Unable to set project path information!');
 end
@@ -185,7 +173,7 @@ end
 try
     % Bootstrapping Setup
     
-    bootstrap.flag  = questdlg('Perform Bootstrap',...
+    bootstrap.flag  = questdlg('Perform Bootstrap?',...
         'Confirm Bootstrap',...
         'Yes','No','Cancel','No');
     
@@ -264,19 +252,26 @@ try
     % List subject directory
     subjDir=dir(rawData.funcDir);
     
-    % Remove non-subject directories & possible files in directory
+    % Remove any files in directory
     for i=1:length(subjDir)
-        subFlag(i) = isempty(strfind(subjDir(i).name,'.'));
+        if subjDir(i).isdir==0
+            fileFlag(i) = 0;
+        else
+            fileFlag(i) = 1;
+        end
+    end
+    subjDir = subjDir(logical(fileFlag));
+    
+    % Remove non-subject directories
+    for i=1:length(subjDir)
+        subFlag(i) = ~isempty(strfind(subjDir(i).name,'sub-'));
     end
     subjDir = subjDir(subFlag);
     
-    % Search 'study_path' directory to get list of subjects
+    % Search directory to get list of subjects
     for i=1:length(subjDir)
         subjects{i,1}=subjDir(i).name;
     end
-    
-    %!mkdir -p $analysisPath/vars
-    %save([Analysis '/vars/subjects.mat'],'subjects');
     
     clear subjCount i subjDir;
 catch
@@ -349,12 +344,12 @@ switch analysisType
     case 'Searchlight'
         save(filename,'directory','rawData','preprocPipeline',...
             'taskInfo','Model','Mask', 'Func','classType',...
-            'subjects','analysisType','regressRT','roiPath','searchlight',...
+            'subjects','analysisType','regressRT','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize');
     otherwise
         save(filename,'directory','rawData','preprocPipeline',...
             'taskInfo','Model','Mask','Func','classType',...
-            'subjects','analysisType','regressRT','roiPath','searchlight',...
+            'subjects','analysisType','regressRT','searchlight',...
             'bootstrap','trialAnalysis','leaveRuns');
 end
 
