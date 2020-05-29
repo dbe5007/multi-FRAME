@@ -97,8 +97,8 @@ echo "Subjects directory is: " $SUBJECTS_DIR
 #subcortColorCode=(9 11 12 13 17 18 19 26 27 48 50 51 52 53 54 55 58 59)
 #subcortColorName=('lh_Thalamus' 'lh_Caudate' 'lh_Putamen' 'lh_Pallidum' 'lh_Hippocampus' 'lh_Amygdala' 'lh_Insula' 'lh_Accumbens' 'lh_Substancia' 'rh_Thalamus' 'rh_Caudate' 'rh_Putamen' 'rh_Pallidum' 'rh_Hippocampus' 'rh_Amygdala' 'rh_Insula' 'rh_Accumbens' 'rh_Substancia')
 
-subcortColorCode=(6 7 8 9 10 11 12 13 17 18 19 20 26 27 28 45 46 47 48 49 50 51 52 53 54 55 56 58 59 60)
-subcortColorName=('lh_Cerebellum_Ext' 'lh_Cerebellum_WM' 'lh_Cerebellum_Cortex' 'lh_Thalamus' 'lh_Thalamus_Proper' 'lh_Caudate' 'lh_Putamen' 'lh_Pallidum' 'lh_Hippocampus' 'lh_Amygdala' 'lh_Insula' 'lh_Operculum' 'lh_Accumbens' 'lh_Substancia' 'lh_VentralDC' 'rh_Cerebellum_Ext' 'rh_Cerebellum_WM' 'rh_Cerebellum_Cortex' 'rh_Thalamus' 'rh_Thalamus_Proper' 'rh_Caudate' 'rh_Putamen' 'rh_Pallidum' 'rh_Hippocampus' 'rh_Amygdala' 'rh_Insula' 'rh_Operculum' 'rh_Accumbens' 'rh_Substancia' 'rh_VentralDC')
+subcortColorCode=(9 10 11 12 13 17 18 19 26 27 48 49 50 51 52 53 54 55 58 59)
+subcortColorName=('lh_Thalamus' 'lh_Thalamus_Proper' 'lh_Caudate' 'lh_Putamen' 'lh_Pallidum' 'lh_Hippocampus' 'lh_Amygdala' 'lh_Insula' 'lh_Accumbens' 'lh_Substancia' 'rh_Thalamus' 'rh_Thalamus_Proper' 'rh_Caudate' 'rh_Putamen' 'rh_Pallidum' 'rh_Hippocampus' 'rh_Amygdala' 'rh_Insula' 'rh_Accumbens' 'rh_Substancia')
 
 # Cortical labels #
 aparcColorName=('unknown' 'bankssts' 'caudalanteriorcingulate' 'caudalmiddlefrontal' 'corpuscallosum' 'cuneus' 'entorhinal' 'fusiform' 'inferiorparietal' 'inferiortemporal' 'isthmuscingulate' 'lateraloccipital' 'lateralorbitofrontal' 'lingual' 'medialorbitofrontal' 'middletemporal' 'parahippocampal' 'paracentral' 'parsopercularis' 'parsorbitalis' 'parstriangularis' 'pericalcarine' 'postcentral' 'posteriorcingulate' 'precentral' 'precuneus' 'rostralanteriorcingulate' 'rostralmiddlefrontal' 'superiorfrontal' 'superiorparietal' 'superiortemporal' 'supramarginal' 'frontalpole' 'temporalpole' 'transversetemporal' 'insula')
