@@ -77,7 +77,7 @@ for iteration=1:length(subjects)
         filesep subjects{iteration} filesep '*.nii.gz']);
     
     %Debug
-    masks=masks(5:15);
+    masks=masks(1:5);
     
     for curMask = 1:length(masks)
         
@@ -145,10 +145,10 @@ for iteration=1:length(subjects)
         % variable to 'Trial'.
         %         switch trialAnalysis
         %             case 'Run'
-%         switch trialAnalysis
-%             case 'Trial'
-%                 currDataset.sa.chunks=(1:1:length(currDataset.sa.chunks))';
-%         end
+        %         switch trialAnalysis
+        %             case 'Trial'
+        %                 currDataset.sa.chunks=(1:1:length(currDataset.sa.chunks))';
+        %         end
         
         % Identify trials of interest for each condition
         if exist('subConds','var')
@@ -269,37 +269,41 @@ for iteration=1:length(subjects)
                 try
                     % Define a neighborhood with approximately 100 voxels in
                     % each searchlight.
-                    nbrhood=cosmo_spherical_neighborhood(currDataset,metric,...
-                        searchlightSize);
+                    nbrhood=cosmo_spherical_neighborhood(currDataset,...
+                        searchlight.Metric,searchlight.Size);
                     
                     %%% Test/Train Flag
                     % If set to 'Trial', partitions are not checked for balance
                     % because they cannot be. Code will crash/not classify if
                     % balancing is not set to be ignored.
-                    switch trialAnalysis
-                        case 'Trial'
-                            opt.check_partitions=false;
-                    end
+                    %
+                    % This has been removed from the parameters but can be
+                    % included by uncommenting this code and resetting the
+                    % 'trialAnalysis' variable to 'Trial.
+                    %                 switch trialAnalysis
+                    %                     case 'Trial'
+                    %                         opt.check_partitions=false;
+                    %                 end
                     
                     % Run the searchlight
                     searchResults = cosmo_searchlight...
                         (currDataset,nbrhood,measure,opt);
-                    save([outputPath '/searchlightResults_' regionName '_' metric '_' ...
-                        num2str(searchlightSize) '.mat'],'searchResults');
+                    save([outputPath '/searchlightResults_' regionName '_' searchlight.Metric '_' ...
+                        num2str(searchlight.Size) '.mat'],'searchResults');
                     
                     % print output dataset
                     fprintf('Dataset output:\n');
                     
                     % Define output location
                     if ~exist('subConds','var')
-                        output=strcat(outputPath,'/',subject,'_',...
+                        output=strcat(outputPath,'/',subjects{iteration},'_',...
                             classifier.name,'_Searchlight_',regionName,'_',...
-                            metric,'_',num2str(searchlightSize),'_',...
+                            searchlight.Metric,'_',num2str(searchlight.Size),'_',...
                             taskInfo.Conditions{1},'_vs_',taskInfo.Conditions{2},'.nii');
                     else
                         output=strcat(outputPath,'/',subject,'_',...
                             classifier.name,'_Searchlight_',regionName,'_',...
-                            metric,'_',num2str(searchlightSize),'_',...
+                            searchlight.metric,'_',num2str(searchlight.Size),'_',...
                             taskInfo.Conditions{1},'_vs_',taskInfo.Conditions{2},'_',subConds{1,1},'.nii');
                     end
                     
@@ -333,13 +337,13 @@ for iteration=1:length(subjects)
                 % because they cannot be. Code will crash/not classify if
                 % balancing is not set to be ignored.
                 %
-                % This has been removed from the parameters but can be 
-                % included by uncommenting this code and resetting the 
+                % This has been removed from the parameters but can be
+                % included by uncommenting this code and resetting the
                 % 'trialAnalysis' variable to 'Trial.
-%                 switch trialAnalysis
-%                     case 'Trial'
-%                         opt.check_partitions=false;
-%                 end
+                %                 switch trialAnalysis
+                %                     case 'Trial'
+                %                         opt.check_partitions=false;
+                %                 end
                 
                 %Bootstrapping
                 switch bootstrap.flag
@@ -396,14 +400,14 @@ for iteration=1:length(subjects)
                             currPermute = permutation(i);
                             
                             % Unequal Trial Check  %%% IN PROGRESS %%%
-%                             for j=1:taskInfo.Runs
-%                                 if length(partitions.test_indices{j}) ~= length(permutation(i).(['perm' num2str(j)]))
-%                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
-%                                     permutation(i).(['perm' num2str(j)])(I)=[];
-%                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
-%                                     permutation(i).(['perm' num2str(j)])(I)=[];
-%                                 end
-%                             end
+                            %                             for j=1:taskInfo.Runs
+                            %                                 if length(partitions.test_indices{j}) ~= length(permutation(i).(['perm' num2str(j)]))
+                            %                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
+                            %                                     permutation(i).(['perm' num2str(j)])(I)=[];
+                            %                                     [~,I] = max(permutation(i).(['perm' num2str(j)]));
+                            %                                     permutation(i).(['perm' num2str(j)])(I)=[];
+                            %                                 end
+                            %                             end
                             
                             try
                                 [predictions, accuracy] = ...
@@ -677,13 +681,13 @@ try
                             finalTableBootstrap{3,1}='Permutations greater than True Accuracy';
                             finalTableBootstrap{4,1}='Bootstrap p value';
                             tmpCnt=2;
-                        
+                            
                             for header=1:length(masks)
                                 finalTableBootstrap{1,tmpCnt}=strcat...
                                     (files(header).name(1:end-7),'_classAcc');
                                 tmpCnt=tmpCnt+1;
                             end
-                        
+                            
                             row=2;
                             header=3;
                             clear tempcount;
@@ -741,24 +745,24 @@ try
                 fclose(file);
                 
                 %Run R Markdown graph %%% IN DEVELOPMENT %%%
-%                 try
-%                     % Directory variables
-%                     curDir = pwd;
-%                     markdown = which('anovaGraphOnlyMarkdown.r');
-%                     
-%                     % Call R script from command line
-%                     cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
-%                         '''; knit(''' markdown ''', ''anovaGraphOnlyMarkdown.html'')"'];
-%                     [status,cmdout] = system(cmd);
-%                     
-%                     % Move HTML to output folder
-%                     setenv('dataPath',analysis);
-%                     setenv('curDir',curDir);
-%                     !mv -t $dataPath $curDir/analyses/anovaGraphOnlyMarkdown.html figure/
-%                     
-%                 catch
-%                     message('Unable to save table and figure!');
-%                 end
+                %                 try
+                %                     % Directory variables
+                %                     curDir = pwd;
+                %                     markdown = which('anovaGraphOnlyMarkdown.r');
+                %
+                %                     % Call R script from command line
+                %                     cmd = ['Rscript -e "library(knitr); dataPath <- ''' analysis...
+                %                         '''; knit(''' markdown ''', ''anovaGraphOnlyMarkdown.html'')"'];
+                %                     [status,cmdout] = system(cmd);
+                %
+                %                     % Move HTML to output folder
+                %                     setenv('dataPath',analysis);
+                %                     setenv('curDir',curDir);
+                %                     !mv -t $dataPath $curDir/analyses/anovaGraphOnlyMarkdown.html figure/
+                %
+                %                 catch
+                %                     message('Unable to save table and figure!');
+                %                 end
                 
             case 'Yes'
                 % Save comparison of permuted and true accuracy to CSV file
