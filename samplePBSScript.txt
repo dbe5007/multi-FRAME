@@ -1,0 +1,26 @@
+#PBS -A open
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=48:00:00
+#PBS -l pmem=8gb
+#PBS -o /path/to//PBS/output
+#PBS -e /path/to/PBS/error
+
+## Load MATLAB ##
+module load matlab/R2017b
+
+## Set Parameter File Information ##
+paramsFilename=params_XXX.mat
+paramsFileFullpath=/path/to/$paramsFile
+
+## Run Preprocessing ##
+matlab -nodisplay -nosplash -nodesktop -r "commandFlag=1;file=$paramsFilename;load($paramsFileFullpath);run(which('multi-FRAME/modeling/preprocessData.m'));quit"
+
+## Specify Model ##
+#matlab -nodisplay -nosplash -nodesktop -r "commandFlag=1;file=$paramsFilename;load($paramsFileFullpath);run(which('multi-FRAME/modeling/speciyModel.m'));quit"
+
+## Estimate Model ##
+#matlab -nodisplay -nosplash -nodesktop -r "commandFlag=1;file=$paramsFilename;load($paramsFileFullpath);run(which('multi-FRAME/modeling/estimateModel.m'));quit"
+
+## Run MVPA Classification ##
+#matlab -nodisplay -nosplash -nodesktop -r "commandFlag=1;file=$paramsFilename;load($paramsFileFullpath);run(which('multi-FRAME/analyses/runMVPAClassification.m'));quit"
+

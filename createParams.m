@@ -202,12 +202,12 @@ try
                 leaveRuns = NaN;
                 
                 if strcmpi(analysisType, 'Searchlight')==1
-                    metric = questdlg('Searchlight Metric',...
+                    searchlight.Metric = questdlg('Searchlight Metric',...
                         'SearchlightSize','count','radius','Cancel','count');
                     
-                    searchlightSize = inputdlg('Size of the searchlight',...
+                    searchlight.Size = inputdlg('Size of the searchlight',...
                         'Searchlight Size',[1 35],{'50'});
-                    searchlightSize = str2double(searchlightSize{:});
+                    searchlight.Size = str2double(searchlight.Size{:});
                 end
                 
             catch
@@ -285,9 +285,7 @@ try
     
     subconditionFlag = questdlg('Are there subconditions? (If unsure select No)',...
         'Confirm Subconditions','Yes','No','Cancel','No');
-    
-    save([Analysis '/vars/conds.mat'],'conds');
-    
+        
     switch subconditionFlag
         case 'Yes'
             [index,tf] = listdlg('Name','Possible Conditions',...
@@ -296,7 +294,6 @@ try
                 'ListSize',[280,300]);
             
             subconds=subconds(index);
-            %save([Analysis '/vars/subconds.mat'],'subconds');
             subconditionFlag = 'TRUE';
             
         case 'No'
@@ -311,28 +308,26 @@ end
 
 try
     % Set filename for parameter .mat file
+    for i=1:length(taskInfo.Conditions)
+        if i==1
+            conds=taskInfo.Conditions{i};
+        else
+            conds=[conds '-' taskInfo.Conditions{i}];
+        end
+        
+    end
     switch analysisType
         case 'Searchlight'
-            filename=strcat(directory.Analysis,'/params_',preprocPipeline,'_',...
-                taskInfo.Name,'_',classType,'_',analysisType,'_',taskInfo.Conditions{1},...
-                '_',taskInfo.Conditions{2},'_subConds_',subconditionFlag,'_Bootstrap_',...
-                bootstrap.flag,'_',metric,'_',num2str(searchlightSize),...
-                '.mat');
-        otherwise
-            for i=1:length(taskInfo.Conditions)
-                if i==1
-                    conds=taskInfo.Conditions{i};
-                else
-                    conds=[conds '-' taskInfo.Conditions{i}];
-                end
-                
-            end
-            
-            %End Working
             filename=strcat(directory.Analysis,'/params_',preprocPipeline,...
                 '_',taskInfo.Name,'_',classType,'_',analysisType,'_Conds_',...
                 conds,'_subConds_',subconditionFlag,'_Bootstrap_',...
-                bootstrap.flag,'.mat');
+                bootstrap.flag,'_Searchlight',searchlight.Metric,'_',...
+                num2str(searchlight.Size),'.mat');
+        otherwise
+            filename=strcat(directory.Analysis,'/params_',preprocPipeline,...
+                '_',taskInfo.Name,'_',classType,'_',analysisType,'_Conds_',...
+                conds,'_subConds_',subconditionFlag,'_Bootstrap_',...
+                bootstrap.flag,'_Searchlight_No.mat');
     end
     
 catch
@@ -345,13 +340,32 @@ switch analysisType
         save(filename,'directory','rawData','preprocPipeline',...
             'taskInfo','Model','Mask', 'Func','classType',...
             'subjects','analysisType','regressRT','searchlight',...
-            'bootstrap','trialAnalysis','leaveRuns','metric','searchlightSize');
+            'bootstrap','trialAnalysis','leaveRuns');
     otherwise
         save(filename,'directory','rawData','preprocPipeline',...
             'taskInfo','Model','Mask','Func','classType',...
-            'subjects','analysisType','regressRT','searchlight',...
+            'subjects','analysisType','regressRT',...
             'bootstrap','trialAnalysis','leaveRuns');
 end
+
+%% Create PBS Script for Command Line Processing
+
+% Identify shell script
+cmd=which('multi-FRAME/modeling/createPBSScript.sh');
+setenv('cmd',cmd);
+
+% Break filename into parts
+[filepath,name]=fileparts(filename);
+
+% Set Variables
+setenv('fileName',name);
+setenv('filePath',filepath);
+setenv('project',directory.Project);
+
+% Create PBS script
+!sh $cmd --paramsFile $fileName --paramsDir $filePath --projectDir $project
+
+%% Cleanup
 
 clear;
 clc;

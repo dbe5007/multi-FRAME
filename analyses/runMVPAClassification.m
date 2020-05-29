@@ -29,7 +29,7 @@
 
 %% Set Analysis Parameters & Paths
 % Load all relevent project information
-if exist('flag','var') == 0
+if exist('commandFlag','var') == 0
     
     %Select parameter file is flag does not exist
     [file,path]=uigetfile('*.mat','Select params file');
@@ -51,7 +51,7 @@ parentDir = directory.Model;
 analysis = [directory.Analysis filesep 'models' filesep file(1:end-4)];
 
 %Debug
-subjects(2)=[];
+%subjects(2)=[];
 
 %% Main Body
 for iteration=1:length(subjects)
@@ -77,8 +77,7 @@ for iteration=1:length(subjects)
         filesep subjects{iteration} filesep '*.nii.gz']);
     
     %Debug
-    masks=masks(9:13);
-    bootstrap.perm = 500;
+    masks=masks(5:15);
     
     for curMask = 1:length(masks)
         

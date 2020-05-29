@@ -18,21 +18,9 @@
 % subjects, & conditions, and analysis name. See createParams.m for full
 % list.
 
-%% Pre-Analysis Setup
-
-% Add CoSMoMVPA to the MATLAB search path
-addpath(genpath('/path/to/CoSMoToolbox'));
-
-% Required for boostrap code to function
-%addpath('/path/to/CANLab-Multivariate-Scripts/functions/cosmo_crossvalidate_bootstrap.m');
-addpath(fileparts(which('cosmo_crossvalidate_bootstrap.m')));
-
-% turn cosmo warnings off
-cosmo_warning('off');
-
 %% Set Analysis Parameters & Paths
-% Load subject IDs, ROIs, and Condition flags
-if exist('flag','var') == 0
+% Load all relevent project information
+if exist('commandFlag','var') == 0
     
     %Select parameter file is flag does not exist
     [file,path]=uigetfile('*.mat','Select params file');
@@ -41,6 +29,9 @@ if exist('flag','var') == 0
     
 end
 
+% turn cosmo warnings off
+cosmo_warning('off');
+
 % Filepath for results folder
 parentDir = directory.Model;
 
@@ -48,7 +39,7 @@ parentDir = directory.Model;
 analysis = [directory.Analysis filesep 'models' filesep file(1:end-4)];
 
 %Debug
-subjects(2)=[];
+%subjects(2)=[];
 
 %% Main Body
 for iteration=1:length(subjects)

@@ -26,7 +26,7 @@
 
 %% Set Analysis Parameters & Paths
 % Load all relevent project information
-if exist('flag','var') == 0
+if exist('commandFlag','var') == 0
     
     %Select parameter file is flag does not exist
     [file,path]=uigetfile('*.mat','Select params file');

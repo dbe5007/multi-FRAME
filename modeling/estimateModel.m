@@ -10,7 +10,7 @@
 
 %% Set Analysis Parameters & Paths
 % Load all relevent project information
-if exist('flag','var') == 0
+if exist('commandFlag','var') == 0
     
     %Select parameter file is flag does not exist
     [file,path]=uigetfile('*.mat','Select params file');
@@ -68,7 +68,7 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     switch preprocPipeline
         case 'spm12'
             
-            procDataDir = fullfile(directory.Project, 'derivatives',...
+            procDataDir = fullfile(directory.Project, 'preprocessing',...
                 'spmPreprocessing');
             
             procFuncFiles = dir(fullfile(procDataDir, subjects{curSub},...
