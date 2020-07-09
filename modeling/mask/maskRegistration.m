@@ -15,7 +15,7 @@
 
 %% Set Analysis Parameters & Paths
 % Load all relevent project information
-if exist('flag','var') == 0
+if exist('commandFlag','var') == 0
     
     %Select parameter file is flag does not exist
     [file,path]=uigetfile('*.mat','Select params file');
@@ -28,7 +28,7 @@ end
 
 % Setup mask options
 % Account for RT/regress out. No is default
-maskDirFlag = {'A prior mask directory',...
+maskDirFlag = {'A priori mask directory',...
     'Freesurfer (used package shell script)','I do not have one'};
 
 [index,tf] = listdlg('PromptString','Select Mask Directory:',...
@@ -48,7 +48,7 @@ switch index
         maskDir = [directory.Project filesep maskDir];
         
         % Get all masks in directory
-        masks=dir([maskDir '/*.ni*']);
+        masks=dir([maskDir '/*.nii*']);
         
         % Drop-down list of found masks - select all that apply
         [index,tf] = listdlg('Name','Available Masks',...
@@ -82,44 +82,110 @@ switch index
         
     case 2 % Freesurfer ROIs parcellated via package shell script
         
-        % Get Freesurfer subject directory
-        fsSubjDir = inputdlg(['Enter path to freesurfer subjects directory starting after: '...
-            directory.Project],'File Path',[1 35],{'e.g. path/to/subjects_dir'});
-        fsSubjDir = [directory.Project filesep fsSubjDir{:}];
-        
-        fsRegions = dir([fsSubjDir '/' subjects{1} '/func/segmentationSplit/*.nii.gz']);
-        for i=1:length(fsRegions)
-            maskList{i}=fsRegions(i).name;
-        end
-        
-        % Drop-down list of found masks - select all that apply
-        [index,tf] = listdlg('Name','Available Masks',...
-            'PromptString','Ctrl+Click to choose masks:',...
-            'ListString',maskList,...
-            'ListSize',[280,300]);
-        regions=fsRegions(index);
-        
-        % Preallocate final variable
-        %finalMasks=cell(1,length(regions));
-        
-        for i=1:length(subjects)
-            for j=1:length(regions)
-                datainput=[fsSubjDir '/' subjects{i} '/func/segmentationSplit/'...
-                    regions(j).name];
-                output=[directory.Analysis filesep 'masks' filesep ...
-                    file(1:end-4) filesep subjects{i} filesep regions(j).name '.nii.gz'];
+        switch resliceFlag
+            case 'No'
                 
-                % Set system/terminal variables
-                setenv('outDir',[directory.Analysis filesep 'masks' filesep ...
-                    file(1:end-4) filesep subjects{i}]);
-                setenv('datainput',datainput);
+                % Get Freesurfer subject directory
+                fsSubjDir = inputdlg(['Enter path to freesurfer subjects directory starting after: '...
+                    directory.Project],'File Path',[1 35],{'e.g. path/to/subjects_dir'});
+                fsSubjDir = [directory.Project filesep fsSubjDir{:}];
                 
-                % Copy to mask directory
-                !mkdir -p $outDir
-                !cp $datainput $outDir
+                fsRegions = dir([fsSubjDir '/' subjects{1} '/segmentationSplit/*.nii.gz']);
+                for i=1:length(fsRegions)
+                    maskList{i}=fsRegions(i).name;
+                end
                 
-                %finalMasks{1,j}=regions{j};
-            end
+                % Drop-down list of found masks - select all that apply
+                [index,tf] = listdlg('Name','Available Masks',...
+                    'PromptString','Ctrl+Click to choose masks:',...
+                    'ListString',maskList,...
+                    'ListSize',[280,300]);
+                regions=fsRegions(index);
+                
+                for i=1:length(subjects)
+                    
+                    % Set subject output directory
+                    setenv('outDir',[directory.Analysis filesep 'masks' filesep ...
+                        file(1:end-4) filesep subjects{i}]);
+                    !mkdir -p $outDir
+                    
+                    % Reference functional image
+                    reference = [directory.Model filesep subjects{i} filesep 'beta_0001.nii.gz'];
+                    
+                    for j=1:length(regions)
+                        
+                        % Region/ROI to transform
+                        datainput = [fsSubjDir '/' subjects{i} '/segmentationSplit/'...
+                            regions(j).name];
+                        
+                        % Output prefix for transformed region/ROI
+                        output=[directory.Analysis filesep 'masks' filesep ...
+                            file(1:end-4) filesep subjects{i} filesep regions(j).name];
+                        
+                        % Set system/terminal variables
+                        setenv('region',regions(j).name);
+                        setenv('datainput',datainput);
+                        setenv('output',output);
+                        setenv('reference',reference);
+                        
+                        % Skip previously resliced regions - AFNI will NOT
+                        % overwrite!!!
+                        if ~exist(output,'file')
+                            % Call AFNI from system/terminal to fit region to subject space
+                            !echo "Fitting $region to subject functional..."
+                            !3dresample -dxyz 3.0 3.0 3.0 -prefix $output -input $datainput
+                            %!3dresample -master $reference -prefix $output2 -input $output
+                            %WORKS%!singularity exec /storage/work/dbe5007/ANTs.sif ResampleImageBySpacing 3 $test $testOutput 3 3 3 0 0 1
+                            %!singularity exec /storage/work/dbe5007/ANTs.sif sh antsRegistrationSyNQuick.sh -d 3 -t s -f $reference -m $output 
+                        end
+                    end
+                end
+                
+                
+            case 'Yes'
+                
+                % Get Freesurfer subject directory
+                fsSubjDir = inputdlg(['Enter path to freesurfer subjects directory starting after: '...
+                    directory.Project],'File Path',[1 35],{'e.g. path/to/subjects_dir'});
+                fsSubjDir = [directory.Project filesep fsSubjDir{:}];
+                
+                fsRegions = dir([fsSubjDir '/' subjects{1} '/func/segmentationSplit/*.nii.gz']);
+                for i=1:length(fsRegions)
+                    maskList{i}=fsRegions(i).name;
+                end
+                
+                % Drop-down list of found masks - select all that apply
+                [index,tf] = listdlg('Name','Available Masks',...
+                    'PromptString','Ctrl+Click to choose masks:',...
+                    'ListString',maskList,...
+                    'ListSize',[280,300]);
+                regions=fsRegions(index);
+                
+                for i=1:length(subjects)
+                    % Set subject output directory
+                    setenv('outDir',[directory.Analysis filesep 'masks' filesep ...
+                        file(1:end-4) filesep subjects{i}]);
+                    !mkdir -p $outDir
+                    
+                    for j=1:length(regions)
+                        % Region/ROI to transform
+                        datainput = [fsSubjDir '/' subjects{i}...
+                            '/segmentationSplit/' regions(j).name];
+                        
+                        % Output prefix for transformed region/ROI
+                        output = [directory.Analysis filesep 'masks' filesep ...
+                            file(1:end-4) filesep subjects{i} filesep regions(j).name];
+                        
+                        % Set system/terminal variables
+                        setenv('outDir',[directory.Analysis filesep 'masks'...
+                            filesep file(1:end-4) filesep subjects{i}]);
+                        setenv('datainput',datainput);
+                        
+                        % Copy to mask directory
+                        !cp $datainput $outDir
+                    end
+                end
+                
         end
         
     case 3
