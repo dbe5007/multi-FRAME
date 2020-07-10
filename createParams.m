@@ -99,12 +99,12 @@ try
         'Number of Runs',[1 35],{'1'});
     taskInfo.Runs = str2double(taskInfo.Runs{:});
     
-    taskInfo.Trials = inputdlg('How many trials per run [sum trials for all conditions]?',...
-        'Volume Number',[1 35],{'40'});
-    taskInfo.Trials = str2double(taskInfo.Trials{:});
+    %taskInfo.Trials = inputdlg('How many trials per run [sum trials for all conditions]?',...
+    %    'Volume Number',[1 35],{'40'});
+    %taskInfo.Trials = str2double(taskInfo.Trials{:});
     
     
-    %% Set Project-Specific Variables
+    %% Set Project Specific Variables
     
     % Please specify:
     % -The units used (i.e., 'scans' or 'secs')
