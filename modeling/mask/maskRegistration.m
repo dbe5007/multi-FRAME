@@ -170,7 +170,7 @@ switch index
                     for j=1:length(regions)
                         % Region/ROI to transform
                         datainput = [fsSubjDir '/' subjects{i}...
-                            '/segmentationSplit/' regions(j).name];
+                            '/func/segmentationSplit/' regions(j).name];
                         
                         % Output prefix for transformed region/ROI
                         output = [directory.Analysis filesep 'masks' filesep ...
