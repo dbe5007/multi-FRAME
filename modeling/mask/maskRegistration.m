@@ -45,23 +45,29 @@ switch index
         % Path to mask directory
         maskDir = inputdlg(['Enter path to mask folder data starting from: '...
             directory.Project],'File Path',[1 35],{'e.g. project/masks'});
-        maskDir = [directory.Project filesep maskDir];
+        maskDir = cell2mat([directory.Project filesep maskDir]);
         
         % Get all masks in directory
         masks=dir([maskDir '/*.nii*']);
         
+        for i=1:length(masks)
+            maskList{i}=masks(i).name;
+        end
+        
         % Drop-down list of found masks - select all that apply
         [index,tf] = listdlg('Name','Available Masks',...
             'PromptString','Ctrl+Click to choose masks:',...
-            'ListString',masks.Name,...
+            'ListString',maskList,...
             'ListSize',[280,300]);
         maskList=maskList(index);
-        regions=maskName(index);
+        regions=maskList(index);
+        
+        dataDir = [directory.Model '/' subjects{1} '/beta_0001.nii.gz'];
         
         for i=1:length(regions)
-            datainput=maskList{i};
+            datainput=[masks(1).folder filesep maskList{i}];
             reference=dataDir;
-            output=[directory.Analysis filesep 'masks' filesep,roiPrefix,regions{i}];
+            output=[directory.Analysis filesep 'masks' filesep file(1:end-4) filesep 'reslice_' regions{i}];
             
             % Set system/terminal variables
             setenv('region',regions{i});
@@ -71,6 +77,10 @@ switch index
             
             % Skip previously resliced regions - AFNI will NOT
             % overwrite!!!
+            setenv('outDir',[directory.Analysis filesep 'masks' filesep ...
+                file(1:end-4)]);
+            !mkdir -p $outDir
+            
             if ~exist(output,'file')
                 % Call AFNI from system/terminal to fit region to subject space
                 !echo "Fitting $region to subject functional..."
