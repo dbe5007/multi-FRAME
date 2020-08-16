@@ -222,6 +222,17 @@ try
             try
                 trialAnalysis = 'Individual';
                 
+                leaveRuns = NaN;
+             
+                if strcmpi(analysisType, 'Searchlight')==1
+                    searchlight.Metric = questdlg('Searchlight Metric',...
+                        'SearchlightSize','count','radius','Cancel','count');
+                    
+                    searchlight.Size = inputdlg('Size of the searchlight',...
+                        'Searchlight Size',[1 35],{'50'});
+                    searchlight.Size = str2double(searchlight.Size{:});
+                end
+            
             catch
                 warning(['Error in setting RSA analysis flags. '...
                     'Set to debug mode.']);
