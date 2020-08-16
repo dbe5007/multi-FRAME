@@ -34,7 +34,7 @@ for i = 1:length(subjects)
     
     % Creates path to the current subjects behavioral file
     curSubj.behavDir  = [directory.Project filesep rawData.behavDir filesep...
-        subjects{i} filesep 'behav'];
+        subjects{i} filesep 'beh'];
     curSubj.behavFile = dir([curSubj.behavDir filesep ...
         '*' taskInfo.Name '*.' rawData.behavFile]);
     
@@ -42,7 +42,7 @@ for i = 1:length(subjects)
         % Reads in the subjects behavioral data using the readtable command.
         % See readtable for more details.
         fprintf('Reading in subject %s behavioral data ...\n', subjects{i});
-        BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name]);
+        BehavData = readtable([curSubj.behavDir filesep curSubj.behavFile.name],'FileType','text');
         
         % Clean up variable names
         BehavData.Properties.VariableNames = regexprep(regexprep...
@@ -68,7 +68,8 @@ for i = 1:length(subjects)
         % structure arrays.
         
         % Convert raw onset column from msec to sec (divide by 1000)
-        onsets = num2cell(BehavData.Onset(BehavData.Run == curRun)/1000)';
+        %onsets = num2cell(BehavData.Onsets(BehavData.Run == curRun)/1000)';
+        onsets = num2cell(BehavData.Onsets(BehavData.Run == curRun));
         
         % Set trial duration to zero for each trial, a stick function
         numTrials = length(onsets);
@@ -90,9 +91,10 @@ for i = 1:length(subjects)
             end
             
             runEventData{ii+1,1}=num2str(ii);
-            runEventData{ii+1,2}=BehavData.EncodingCond{currRunIDs(ii)};
-            runEventData{ii+1,3}=BehavData.Onset(currRunIDs(ii));
-            runEventData{ii+1,4}=BehavData.ResponseTime(currRunIDs(ii));
+            runEventData{ii+1,2}=BehavData.Condition{currRunIDs(ii)};
+            runEventData{ii+1,3}=num2str(BehavData.Onsets(currRunIDs(ii)));
+           % runEventData{ii+1,4}=num2str(BehavData.EncSlideDuration(currRunIDs(ii)));
+            runEventData{ii+1,4}=num2str(durations{(ii)});
             runEventData{ii+1,5}=num2str(curRun);
         end
         
