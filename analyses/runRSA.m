@@ -53,7 +53,8 @@ for iteration=1:length(subjects)
     %                 information from the SPM.mat file.
     dataPath   = fullfile(directory.Model, subjects{iteration});
     outputPath = fullfile(analysis, subjects{iteration});
-    spmFile = [dataPath '/SPM_gz.mat'];
+    %spmFile = [dataPath '/SPM_gz.mat']; %For fMRIprep
+    spmFile = [dataPath '/SPM.mat'];
     
     % create the output path if it doesn't already exist
     if ~exist(outputPath, 'dir')
@@ -61,11 +62,14 @@ for iteration=1:length(subjects)
     end
     
     %% Load Mask Data
-    masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
-        filesep subjects{iteration} filesep '*.nii.gz']);
     
-    %Debug
-    masks=masks(1:3);
+    %For SPM preprocessed
+    %masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
+    %    filesep subjects{iteration} filesep '*.nii.gz']);
+    
+    %For fMRIprep preprocessed
+    masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
+        filesep '*.nii']);
     
     for curMask = 1:length(masks)
         
@@ -225,45 +229,41 @@ for iteration=1:length(subjects)
                                 % Re-index trials within condition into
                                 % separate targets
                                 Conditions(i).sa.targets = [1:length(index)]';
-                            end
-                            
-                            % Re-index trials within condition into
-                            % separate targets
-                            Conditions(i).sa.targets = [1:length(index)]';
-                            
-                            % Setup DSM and searchlight arguments
-                            % DSM
-                            
-                            dsmArgs(i).metric = 'correlation';
-                            dsmArgs(i).center_data = 1;
-                            dsmArgs(i).trialType = taskInfo.Conditions(1,i);
-                            
-                            % Create Target DSM from Condtion 1
-                            targetDSM(i) = cosmo_dissimilarity_matrix_measure(Conditions(i), dsmArgs(i));
-                            
-                            %Convert to similarity for all conds
-                            %individualls
-                            for ii=1:length(targetDSM(i).samples)
-                                if targetDSM(i).samples(ii)<1 && targetDSM(i).samples(ii)>0
-                                    newSim(ii,i) = 1 - targetDSM(i).samples(ii);
-                                else
-                                    newSim(ii,i) = -targetDSM(i).samples(ii);
-                                    newSim(ii,i) = newSim(ii,i) + 1;
+                                Conditions(i).samples = Conditions(i).samples';
+                                
+                                % Setup arguments for ROI and Searchlight
+                                
+                                dsmArgs(i).metric = 'correlation';
+                                dsmArgs(i).center_data = 1;
+                                dsmArgs(i).trialType = taskInfo.Conditions(1,i);
+                                
+                                % Create Target DSM from Condtion 1
+                                targetDSM(i) = cosmo_dissimilarity_matrix_measure(Conditions(i), dsmArgs(i));
+                                
+                                %Convert to similarity for all conds
+                                %individuals
+                                for ii=1:length(targetDSM(i).samples)
+                                    if targetDSM(i).samples(ii)<1 && targetDSM(i).samples(ii)>0
+                                        newSim(ii,i) = 1 - targetDSM(i).samples(ii);
+                                    else
+                                        newSim(ii,i) = -targetDSM(i).samples(ii);
+                                        newSim(ii,i) = newSim(ii,i) + 1;
+                                    end
                                 end
+                                
+                                % Set target DSM
+                                dsmArgs(i).target_dsm = targetDSM(i).samples;
                             end
                             
-                            % Set target DSM
-                            dsmArgs(i).target_dsm = targetDSM(i).samples;
+                            
                     end
                     
-                    %New
+                    % Within Conditon Similarit - Experimental!
                     newRow=1;
                     for i=1:length(taskInfo.Conditions)
                         meanCorrWithinCondition{newRow,i} = mean(newSim(:,i));
                     end
                     newRow = newRow + 1;
-                    
-                    %end new
                     
                     % Get raw correlation matrix back
                     % targetDSMCorrMatrix = cosmo_squareform(targetDSM.samples)
@@ -310,8 +310,10 @@ for iteration=1:length(subjects)
                         for i=1:length(tasks)
                             
                             spmFile = [parentDir '/SingleTrialModel' tasks{i} '/' ...
-                                subject '/SPM_gz.mat'];
-                            spmFile = [dataPath '/SPM_gz.mat'];
+                                %subject '/SPM_gz.mat']; %For fMRIprep
+                                subject '/SPM.mat'];
+                            %spmFile = [dataPath '/SPM_gz.mat']; %For fMRIprep
+                                spmFile = [dataPath '/SPM.mat'];
                             currDataset(i)=cosmo_fmri_dataset([spmFile ':beta'],'mask',curROI);
                             
                         end
@@ -667,13 +669,14 @@ for iteration=1:length(subjects)
             
             switch classType
                 case 'RSA'
-                    % create subjectid and roiid columns
-                    subjectid   = repmat(subjects(iteration), length(TrialTypeCombo(1)), 1);
-                    roiid       = repmat({regionName}, length(TrialTypeCombo(1)), 1);
-                    
-                    % create the stats table
+                
+                    % Create outptu stats table
                     %stats_table = table...
                     %    (subjectid, roiid, TrialTypeCombo, rho(1,2));
+                    
+                     % create subjectid and roiid columns
+                    subjectid   = repmat(subjects(iteration), length(TrialTypeCombo(1)), 1);
+                    roiid       = repmat({regionName}, length(TrialTypeCombo(1)), 1);
                     
                     for i=1:combinations
                         
@@ -694,7 +697,7 @@ for iteration=1:length(subjects)
                     end
                     
                     %Add in within-condition correlation
-                    statsTable = [statsTable];
+                    %statsTable = [statsTable];
                     
                     % write the stats table
                     filename = sprintf('sub-%s_roiid-%s_statistics-table.csv', subjectid{:}, roiid{:});
