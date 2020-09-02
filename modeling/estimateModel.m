@@ -63,16 +63,15 @@ for curSub = 1:length(subjects) %for curSub = number %1:length(Subjects)
     
     % Get directory of motion files
     motionFiles = dir(fullfile(directory.Model, subjects{curSub},...
-                ['*' taskInfo.Name '*.txt']));
+                ['*.txt']));
     
     switch preprocPipeline
         case 'spm12'
             
-            procDataDir = fullfile(directory.Project, 'preprocessing',...
-                'spmPreprocessing');
+            procDataDir = fullfile(directory.Project, 'Func_ret_unsmoothed');
             
             procFuncFiles = dir(fullfile(procDataDir, subjects{curSub},...
-                'func', 'run*',['ar*' taskInfo.Name '*.nii.gz']));
+                'run*',['wa*'])); %taskInfo.Name goes in the middle of the brackets
             
             for i = 1:taskInfo.Runs
                 % Gunzip functional file
