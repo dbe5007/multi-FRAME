@@ -42,7 +42,7 @@ end
 addpath(fileparts(which('cosmo_crossvalidate_bootstrap.m')));
 
 % turn cosmo warnings off
-cosmo_warning('off');
+%cosmo_warning('off');
 
 % Filepath for results folder
 parentDir = directory.Model;
@@ -74,10 +74,10 @@ for iteration=1:length(subjects)
     
     %% Load Mask Data
     masks = dir([directory.Analysis filesep 'masks' filesep file(1:end-4)...
-        filesep subjects{iteration} filesep '*.nii.gz']);
+      filesep subjects{iteration} filesep '*.nii.gz']); %
     
     %Debug
-    masks=masks(1:5);
+    %masks=masks(4:15);
     
     for curMask = 1:length(masks)
         
@@ -464,9 +464,9 @@ for iteration=1:length(subjects)
                         if isnan(finalPredictions(j,curMask))==1
                             correct.(regionName)(j,1)=NaN;
                         elseif finalPredictions(j,curMask)==currDataset.sa.targets(j)
-                            correct.(regionName)(j,1)=1;
+                            correct.regionName(j,1)=1;
                         else
-                            correct.(regionName)(j,1)=0;
+                            correct.regionName(j,1)=0;
                         end
                     end
             end
